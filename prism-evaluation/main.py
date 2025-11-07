@@ -477,12 +477,18 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--apikey", help="The polygon api key", required=True)
-    parser.add_argument(
-        "--basedir", help="Directory base to look for files.", default="./"
-    )
-    args = parser.parse_args()
+    try:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--apikey", help="The polygon api key", required=True)
+        parser.add_argument(
+            "--basedir", help="Directory base to look for files.", default="./"
+        )
+        args = parser.parse_args()
 
-    data = json.loads(sys.stdin.read())
-    main(args.apikey, data)
+        data = json.loads(sys.stdin.read())
+        main(args.apikey, data)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
+
+        
