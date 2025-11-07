@@ -263,6 +263,13 @@ func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check whether the context is fresh, i.e. the timestamp and TTL is after now.
+	fmt.Printf(
+		"DEBUG: Timestamp: %v | TTL: %v | Now: %v\n",
+		userContext.Timestamp,
+		h.timeToLive,
+		time.Now(),
+	)
+
 	if !userContext.Timestamp.Add(h.timeToLive).After(time.Now()) {
 		http.Error(w, "Context expired, you responded too slowly boohoo :(... Try again with a faster computer :P.", http.StatusTeapot)
 		return
