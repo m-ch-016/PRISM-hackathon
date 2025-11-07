@@ -3,7 +3,7 @@ from time import sleep
 
 import requests
 
-URL = "mts-prism.com"
+URL = "quants-uom-prism.online"
 PORT = 8082
 
 # Please do NOT share this information anywhere, unless you want your team to be cooked.
