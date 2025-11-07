@@ -214,7 +214,7 @@ def get_points(
         sic_industry,
         ticker_details,
     )
-    client_sat = client_satisfaction(df, risk_profile(context))
+    client_sat = client_satisfaction(df, risk_profile(context), context.age)
     rar = risk_adjusted_returns(df, context, basedir)
 
     if DEBUG:
