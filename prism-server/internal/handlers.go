@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"io"
+	"bytes"
 )
 
 var port int = 1
@@ -162,47 +164,49 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	       - 8004
 	    Locks around the port update since it is shared amongst goroutines that all serve the go HTTP server (i think)
 	*/
-	// h.pyServerMutex.Lock()
-	// // Base URL
-	// base_url := "http://prism-llm:800%d/generate"
-	// // Format with the port final number
-	// url := fmt.Sprintf(base_url, port)
-	// // Print serverside for debug
-	// fmt.Printf("Requesting from %s\n", url)
-	// // Cycle through values 1,2,3,4
-	// port = port%h.numLLMServers + 1
-	// // Unlock
-	// h.pyServerMutex.Unlock()
-	// Make the request
-	// resp, err := http.Post(url, "application/json", bytes.NewBuffer(content))
-	// if err != nil {
-	// 	http.Error(w, "Failed to POST to PyServer"+err.Error()+"\n\nIf you see this please contact Cyrus or Sai", http.StatusInternalServerError)
-	// 	return
-	// }
-	// defer resp.Body.Close()
+	h.pyServerMutex.Lock()
+	// Base URL
+	base_url := "http://prism-llm:800%d/generate"
+	// Format with the port final number
+	url := fmt.Sprintf(base_url, port)
+	// Print serverside for debug
+	fmt.Printf("Requesting from %s\n", url)
+	// Cycle through values 1,2,3,4
+	port = port%h.numLLMServers + 1
+	// Unlock
+	h.pyServerMutex.Unlock()
+	//Make the request
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(content))
+	if err != nil {
+		http.Error(w, "Failed to POST to PyServer"+err.Error()+"\n\nIf you see this please contact Cyrus or Sai", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
 
-	// Read the response body
-	// llm_resp, err := io.ReadAll(resp.Body)
-	// if err != nil {
-	// 	fmt.Println("Error reading LLM response body:", err)
-	// 	return
-	// }
+	//Read the response body
+	llm_resp, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("Error reading LLM response body:", err)
+		return
+	}
 
-	// Unmarshal the response into the LLMResponse struct
-	// var llmResp LLMResponse
-	// err = json.Unmarshal(llm_resp, &llmResp)
-	// if err != nil {
-	// 	fmt.Println("Error unmarshalling LLM response:", err)
-	// 	return
-	// }
+	//Unmarshal the response into the LLMResponse struct
+	var llmResp LLMResponse
+	err = json.Unmarshal(llm_resp, &llmResp)
+	if err != nil {
+		fmt.Println("Error unmarshalling LLM response:", err)
+		return
+	}
 
-	// Set the message to be just the "body" of the response
-	// resp_to_user := Response{
-	// 	Message: llmResp.Body,
-	// }
+	//Set the message to be just the "body" of the response
+	resp_to_user := Response{
+		Message: llmResp.Body,
+	}
+	/*
 	resp_to_user := Response{
 		Message: string(content),
 	}
+	*/
 
 	// Map context to the individual user, identified by their API token.
 	h.userContextMutex.Lock()
