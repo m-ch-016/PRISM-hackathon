@@ -22,7 +22,7 @@ const (
 	defaultPostgresPort     = 5432
 	defaultPostgresDatabase = "prism"
 	defaultTTL              = 30000
-	defaultNumLLMServers    = 4
+	defaultNumLLMServers    = 6
 	defaultMaxDeltaSpamTime = 0
 	defaultConnectionCount  = 20
 )

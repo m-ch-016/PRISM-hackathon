@@ -162,6 +162,7 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	       - 8002
 	       - 8003
 	       - 8004
+	       - maybe more ~ cyrus 7/11
 	    Locks around the port update since it is shared amongst goroutines that all serve the go HTTP server (i think)
 	*/
 	h.pyServerMutex.Lock()

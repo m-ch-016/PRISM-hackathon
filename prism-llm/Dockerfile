@@ -13,6 +13,8 @@ EXPOSE 8001
 EXPOSE 8002
 EXPOSE 8003
 EXPOSE 8004
+EXPOSE 8005
+EXPOSE 8006
 
 # Copy the entrypoint script
 COPY entrypoint.sh /app/entrypoint.sh
