@@ -14,32 +14,33 @@ export default function AboutPage() {
         {/* Header with Logo */}
         <header className="py-4">
           <div className="flex justify-center">
-            <Logo variant="full" /> </div>
+            <Logo variant="full" />
+          </div>
         </header>
-
 
         <main className="flex-grow flex justify-center items-center px-4">
           <div
             className="
-      w-full
-      max-w-5xl
-      bg-nova-gray4/80
-      backdrop-blur-sm
-      border
-      border-nova-gray5
-      rounded-lg
-      shadow-2xl
-      overflow-y-auto
-      p-8
-      custom-scrollbar
-      content-center
-    "
+              w-full
+              max-w-5xl
+              bg-nova-gray4/80
+              backdrop-blur-sm
+              border
+              border-nova-gray5
+              rounded-lg
+              shadow-2xl
+              overflow-y-auto
+              p-8
+              custom-scrollbar
+              content-center
+            "
             style={{ maxHeight: '70vh' }}
           >
             <h1 className="text-4xl font-light mb-8 text-center">
               Competition Instructions
             </h1>
 
+            {/* About Us */}
             <section className="mb-12">
               <h3 className="text-xl border-t mb-4 pt-4 text-center">About Us</h3>
               <div className="mt-4 flex space-x-4 justify-center">
@@ -56,40 +57,55 @@ export default function AboutPage() {
                   <li>🏆 Quantitative Trading, Research, Development & Blockchain Technology Group</li>
                   <li>📚 Engage in hands-on learning, collaborative projects, and cutting-edge research</li>
                   <li>🤝 Join a thriving network of passionate quants and traders.</li>
-                  
                 </ul>
               </div>
             </section>
 
+            {/* Background & Challenge Overview */}
             <section className="mb-12">
               <h3 className="text-xl border-t mb-4 pt-4 text-center">Background & Challenge Overview</h3>
 
               <h4 className="text-lg font-semibold mb-2">Your Role as Portfolio Manager</h4>
               <p className="mb-4">
-                As a portfolio manager for retail investors, you will receive various details and investment contexts from each investor, including budget, investment period, and miscellaneous personal information. Your job is to interpret these details carefully and accurately.
+                As a portfolio manager for retail investors, you will receive various details and investment contexts from each investor,
+                including budget, investment period, and miscellaneous personal information. Your job is to interpret these details carefully and accurately.
               </p>
 
               <h4 className="text-lg font-semibold mb-2">The Core Task</h4>
               <p className="mb-4">
-                Using the information provided, you must generate a tailored portfolio consisting exclusively of US equities and specify the exact quantity of shares to purchase. Portfolios will be rigorously evaluated against each investor’s specific risk profile derived from the provided details.
+                Using the information provided, you must generate a tailored portfolio consisting exclusively of US equities and specify the exact quantity of shares to purchase.
+                Portfolios will be rigorously evaluated against each investor’s specific risk profile derived from the provided details.
               </p>
 
               <h4 className="text-lg font-semibold mb-2">Evaluation Criteria</h4>
               <p className="mb-4">
-                Your submissions will be ranked first by the points you score, then by the profit your portfolio generates, and finally by the speed of your response. Retail investors are notably impatient, requiring answers rapidly—typically within 10 seconds, though this can vary throughout the day. Manual solutions are not advised 😉.
+                Your submissions will be ranked first by the points you score, then by the profit your portfolio generates, and finally by the speed of your response.
+                Retail investors are notably impatient, requiring answers rapidly—typically within 10 seconds, though this can vary throughout the day.
+                Manual solutions are not advised 😉.
               </p>
+
+              {/* NEW RULES SECTION */}
+              <h4 className="text-lg font-semibold mb-2">Competition Rules</h4>
+              <ul className="list-disc ml-8 space-y-2 mb-4">
+                <li>The competition consists of <strong>3 rounds</strong>, each lasting <strong>3 hours</strong>.</li>
+                <li>There will be a <strong>1-hour break</strong> between each round.</li>
+                <li>The total prize pool of <strong>£1500</strong> is <strong>equally distributed across the 3 rounds</strong> (i.e., £500 per round).</li>
+                <li>Within each round, <strong>prizes are allocated proportionally</strong> based on the weighted returns of each team’s score on the leaderboard.</li>
+                <li>There are <strong>no judges</strong> — the final outcome is <strong>entirely determined by the live leaderboard</strong>.</li>
+              </ul>
 
               <p className="mb-4 font-semibold text-center">
                 Best of luck building your own money-printing machine! 💸🚀
               </p>
             </section>
 
+            {/* Technical Details */}
             <section className="mb-12">
               <h3 className="text-xl border-t mb-4 pt-4 text-center">Technical Details</h3>
 
               <h4 className="text-lg font-semibold mb-2">Service Connection</h4>
               <ul className="list-none ml-4 space-y-1 mb-4">
-                <li><strong>Connect to </strong> http://mts-prism.com:PORT </li>
+                <li><strong>Connect to </strong> http://quants-uom-prism.online:PORT </li>
                 <li><strong>Port 80:</strong> Competition information website</li>
                 <li><strong>Port 8082:</strong> Main server for API interactions</li>
               </ul>
@@ -119,10 +135,9 @@ export default function AboutPage() {
                 <li>Exceeding the specified budget.</li>
                 <li>Selecting stocks that are not recognized.</li>
               </ul>
-
             </section>
 
-
+            {/* Starter Script */}
             <section className="mb-12">
               <h3 className="text-lg font-semibold mb-2">Starter Script</h3>
               <div className="w-full h-[1000px]">
@@ -139,16 +154,13 @@ export default function AboutPage() {
                 Link to starter script, CLICK ME.
               </Link>
             </section>
-
           </div>
         </main>
 
         {/* Footer with Go Back Button */}
         <footer className="py-4">
           <div className="flex justify-center">
-            <AnimatedButton href="/">
-              go back
-            </AnimatedButton>
+            <AnimatedButton href="/">go back</AnimatedButton>
           </div>
         </footer>
       </div>
