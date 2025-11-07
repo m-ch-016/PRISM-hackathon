@@ -18,7 +18,23 @@ DIVERSITY_SCALE = 12
 CLI_SAT_SCALE = 20
 RAR_SCALE = 12
 
+# Target Volatility configuration
+CLIENT_SAT_TARGET_VOL_DEFAULT = 0.08
+
+# Age tolerance configuration
+AGE_YOUNG = 30
+AGE_MID = 50
+AGE_YOUNG_DIVISOR = 12  # (age - AGE_MIN) / AGE_YOUNG_DIVISOR for ramp up
+AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
+
+# Employment status configuration
+UNEMPLOYED_RISK_FACTOR = 1.2
+
+# DONT CHANGE
 DEBUG = False
+AGE_MIN = 18
+AGE_MAX = 80
+AGE_TOL_DEFAULT = 0.6
 
 
 @dataclass
@@ -284,20 +300,37 @@ def stock_count_per_industry(
     return industry_count_map
 
 
-def client_satisfaction(df: pd.DataFrame, risk_profile: float) -> float:
-    """Client satisfaction is a score between 0 and 1"""
+def client_satisfaction(df: pd.DataFrame, risk_profile: float, age: int | None = None, target_vol: float = CLIENT_SAT_TARGET_VOL_DEFAULT) -> float:
+    """Client satisfaction score in [0,1] using returns-based volatility."""
+    r = df["value"].pct_change().dropna()
+    if r.size == 0:
+        return 0.0
+    portfolio_vol = r.std()
+    if not np.isfinite(portfolio_vol):
+        return 0.0
 
-    portfolio_risk = df["value"].std()  # using definition of portfolio volatility
+    rp = max(0.0, min(1.2, risk_profile))
+    base_from_risk = 0.9 - 0.6 * (rp / 1.2)
 
-    k = 2 - (risk_profile / 1.2)
-    client_risk = df["value"].mean() * np.abs(1 - k)
+    def age_tolerance(a: int | None) -> float:
+        if a is None:
+            return AGE_TOL_DEFAULT
+        if a < AGE_MIN or a >= AGE_MAX:
+            return 0.0
+        if a <= AGE_YOUNG:
+            return (a - AGE_MIN) / AGE_YOUNG_DIVISOR
+        if a <= AGE_MID:
+            return 1.0
+        return (AGE_MAX - a) / AGE_OLD_DIVISOR
 
-    # "full marks" for not exceeding risk tolerance; otherwise score falls by
-    # percentage overreached.
-    if client_risk >= portfolio_risk:
-        return 1
+    combined_factor = max(0.05, base_from_risk * age_tolerance(age))
+    tolerance = target_vol * combined_factor
 
-    return 1 - ((portfolio_risk - client_risk) / client_risk)
+    if portfolio_vol <= tolerance:
+        return 1.0
+
+    score = 1 - (portfolio_vol - tolerance) / max(tolerance, 1e-9)
+    return float(max(0.0, min(1.0, score)))
 
 
 def risk_adjusted_returns(
