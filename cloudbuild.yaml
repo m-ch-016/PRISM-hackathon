@@ -9,3 +9,6 @@ images:
 - 'prism-server'
 - 'prism-website'
 - 'prism-llm'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
