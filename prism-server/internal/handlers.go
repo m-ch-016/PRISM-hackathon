@@ -230,7 +230,8 @@ type EvaluationResponse struct {
 
 func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests.
-	fmt.Printf("DEBUG: Request method: %s\n", r.Method)
+	fmt.Printf("DEBUG: Method: %s, Path: %s\n", r.Method, r.URL.Path)
+
 
 	if r.Method != http.MethodPost {
     	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
