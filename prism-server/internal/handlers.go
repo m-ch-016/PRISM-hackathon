@@ -230,9 +230,11 @@ type EvaluationResponse struct {
 
 func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests.
+	fmt.Printf("DEBUG: Request method: %s\n", r.Method)
+
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+    	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+    	return
 	}
 
 	// TODO: This code is duplicated, we should move this into its own function.
@@ -263,6 +265,13 @@ func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check whether the context is fresh, i.e. the timestamp and TTL is after now.
+	fmt.Printf(
+		"DEBUG: Timestamp: %v | TTL: %v | Now: %v\n",
+		userContext.Timestamp,
+		h.timeToLive,
+		time.Now(),
+	)
+
 	if !userContext.Timestamp.Add(h.timeToLive).After(time.Now()) {
 		http.Error(w, "Context expired, you responded too slowly boohoo :(... Try again with a faster computer :P.", http.StatusTeapot)
 		return
