@@ -43,21 +43,20 @@ export default function AboutPage() {
             <section className="mb-12">
               <h3 className="text-xl border-t mb-4 pt-4 text-center">About Us</h3>
               <div className="mt-4 flex space-x-4 justify-center">
-                <Link href="https://www.instagram.com/manchestertradingsociety" target="_blank">
+                <Link href="https://www.instagram.com/quantsuom" target="_blank">
                   <FaInstagram className="text-2xl text-white hover:text-gray-300" />
                 </Link>
-                <Link href="https://www.linkedin.com/company/manchester-trading-society" target="_blank">
+                <Link href="https://www.linkedin.com/company/quants-at-uom" target="_blank">
                   <FaLinkedin className="text-2xl text-white hover:text-gray-300" />
                 </Link>
               </div>
               <div className="mb-4">
-                <h4 className="text-xl mb-2">Manchester Trading Society</h4>
+                <h4 className="text-xl mb-2">Quants@UOM</h4>
                 <ul className="list-none ml-4 space-y-2">
-                  <li>🏆 Top trading society at the University of Manchester (610+ LinkedIn | 430+ Instagram).</li>
-                  <li>💡 By traders, for traders: learn, collaborate, and grow.</li>
-                  <li>📚 Gain skills through workshops, idea-sharing, and real-world projects.</li>
-                  <li>🤝 Join a thriving network of passionate traders and investors.</li>
-                  <li>🚀 Elevate your trading journey with us!</li>
+                  <li>🏆 Quantitative Trading, Research, Development & Blockchain Technology Group</li>
+                  <li>📚 Engage in hands-on learning, collaborative projects, and cutting-edge research</li>
+                  <li>🤝 Join a thriving network of passionate quants and traders.</li>
+                  
                 </ul>
               </div>
             </section>
@@ -128,12 +127,12 @@ export default function AboutPage() {
               <h3 className="text-lg font-semibold mb-2">Starter Script</h3>
               <div className="w-full h-[1000px]">
                 <iframe
-                  src="https://pastebin.com/embed_iframe/AtB95D1S?theme=dark"
+                  src="https://pastebin.com/embed_iframe/2F45tn5t?theme=dark"
                   className="w-full h-full border-0"
                 ></iframe>
               </div>
               <Link
-                href="https://www.instagram.com/manchestertradingsociety"
+                href="https://www.instagram.com/quantsuom/"
                 target="_blank"
                 className="mt-4 block text-blue-500 hover:underline"
               >
@@ -156,4 +155,3 @@ export default function AboutPage() {
     </MainLayout>
   );
 }
-
