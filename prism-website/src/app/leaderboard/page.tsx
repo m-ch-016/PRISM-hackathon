@@ -187,7 +187,7 @@ export default function LeaderboardPage() {
     loadData();
     const interval = setInterval(() => {
       loadData();
-    }, 2000);
+    }, 10000);
 
     setRefreshInterval(interval);
 
