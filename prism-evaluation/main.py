@@ -21,10 +21,10 @@ warnings.filterwarnings("ignore")
 ROI_SCALE = 7              #
 DIVERSITY_SCALE = 0        # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
-RAR_SCALE = 15              # typical range 8-15
+RAR_SCALE = 12              # typical range 8-15
 DRAWDOWN_SCALE = 6          # typical range 3-8
-TAIL_RISK_SCALE = 5      # enable 4-8 when used
-REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
+TAIL_RISK_SCALE = 7      # enable 4-8 when used
+REGIME_ROBUSTNESS_SCALE = 5 # enable 6-10 when used
 RANDOM_SCALE = 2            # typical range 0-3
 SKEWNESS_SCALE = 1          # typical range 0-4
 ENTROPY_SCALE = 12           # if entropy method: 6-12
