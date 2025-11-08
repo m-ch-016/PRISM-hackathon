@@ -19,9 +19,11 @@ DIVERSITY_SCALE = 12
 CLI_SAT_SCALE = 12
 RAR_SCALE = 12
 DRAWDOWN_SCALE = 5
+TAIL_RISK_SCALE = 0
+REGIME_ROBUSTNESS_SCALE = 0  
+RANDOM_SCALE = 1
 
 # RANDOM VARIABLE
-RANDOM_SCALE = 1  # Weight for final random factor (set 0 to disable)
 RANDOM_MIN = -1.0  # Lower bound for random factor (before scaling)
 RANDOM_MAX = 1.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
@@ -233,12 +235,30 @@ def get_points(
         sic_industry,
         ticker_details,
     )
-    client_sat = client_satisfaction(df, risk_profile(context), context.age)
-    rar = risk_adjusted_returns(df, context, basedir)
-    drawdown = max_drawdown_score(df)
+    client_sat = (
+        client_satisfaction(df, risk_profile(context), context.age)
+        if CLI_SAT_SCALE != 0
+        else 0.0
+    )
+    rar = risk_adjusted_returns(df, context, basedir) if RAR_SCALE != 0 else 0.0
+    drawdown = max_drawdown_score(df) if DRAWDOWN_SCALE != 0 else 0.0
+    tail_risk = tail_risk_score(df) if TAIL_RISK_SCALE != 0 else 0.0
+    regime_robustness = (
+        regime_robustness_score(df) if REGIME_ROBUSTNESS_SCALE != 0 else 0.0
+    )
 
     if DEBUG:
-        print(f"{roi=}", f"{diversity=}", f"{client_sat=}", f"{rar=}")
+        print(
+            "[DEBUG] metrics:",
+            f"roi={roi:.4f}",
+            f"diversity={diversity:.4f}",
+            f"client_sat={client_sat:.4f}",
+            f"rar={rar:.4f}",
+            f"drawdown={drawdown:.4f}",
+            f"tail_risk={tail_risk:.4f}",
+            f"regime_robustness={regime_robustness:.4f}",
+            f"random_term={random_term:.4f}",
+        )
 
     # Random additive factor (distinct from early override). Generates a value
     # in [RANDOM_MIN, RANDOM_MAX] each evaluation and scales it. Use seed for reproducibility.
@@ -248,14 +268,23 @@ def get_points(
     else:
         random_term = 0.0
 
-    points = (
-        ROI_SCALE * roi
-        + DIVERSITY_SCALE * diversity
-        + CLI_SAT_SCALE * client_sat
-        + RAR_SCALE * rar
-        + DRAWDOWN_SCALE * drawdown
-        + RANDOM_SCALE * random_term
-    )
+    points = 0.0
+    if ROI_SCALE != 0:
+        points += ROI_SCALE * roi
+    if DIVERSITY_SCALE != 0:
+        points += DIVERSITY_SCALE * diversity
+    if CLI_SAT_SCALE != 0:
+        points += CLI_SAT_SCALE * client_sat
+    if RAR_SCALE != 0:
+        points += RAR_SCALE * rar
+    if DRAWDOWN_SCALE != 0:
+        points += DRAWDOWN_SCALE * drawdown
+    if TAIL_RISK_SCALE != 0:
+        points += TAIL_RISK_SCALE * tail_risk
+    if REGIME_ROBUSTNESS_SCALE != 0:
+        points += REGIME_ROBUSTNESS_SCALE * regime_robustness
+    if RANDOM_SCALE != 0:
+        points += RANDOM_SCALE * random_term
 
     value = df.groupby(level=1).first()["value"].sum()
     points *= 1 - (value / context.budget)
@@ -295,6 +324,78 @@ def max_drawdown_score(df: pd.DataFrame) -> float:
         drawdowns = (equity - peak) / peak
     mdd = abs(np.nanmin(drawdowns)) if np.isfinite(np.nanmin(drawdowns)) else 0.0
     score = 1 - mdd
+    return float(max(0.0, min(1.0, score)))
+
+
+def tail_risk_score(df: pd.DataFrame) -> float:
+    """Tail risk score in [0,1] using CVaR (Expected Shortfall) at 95%.
+
+    Steps:
+      1. Compute daily portfolio returns.
+      2. Find 5th percentile (VaR_95).
+      3. CVaR = mean of returns <= VaR_95 (expected tail loss).
+    Mapping: If CVaR >= 0 (no negative tail), score = 1. Otherwise
+    score = 1 + CVaR / 0.25 (assuming -25% is worst typical daily tail). Clamp to [0,1].
+    Fallback neutral score 0.5 if insufficient data.
+    """
+    try:
+        values = df.groupby(level=0)["value"].sum().astype(float)
+        returns = values.pct_change().dropna()
+    except Exception:
+        return 0.5
+    if returns.size < 5:
+        return 0.5
+    try:
+        var_95 = np.quantile(returns, 0.05)
+        tail = returns[returns <= var_95]
+        if tail.size == 0:
+            return 1.0
+        cvar = tail.mean()
+    except Exception:
+        return 0.5
+    if cvar >= 0:
+        return 1.0
+    score = 1 + (cvar / 0.25)  # cvar negative => subtract proportionally
+    return float(max(0.0, min(1.0, score)))
+
+
+def regime_robustness_score(df: pd.DataFrame, segments: int = 3) -> float:
+    """Regime robustness score in [0,1].
+
+    Split the evaluation window into `segments` equal chronological parts.
+    Compute ROI per segment. Measure consistency via coefficient of variation.
+    Score = 1 / (1 + CV). If overall ROI negative, halve score. Neutral 0.5 fallback.
+    """
+    try:
+        # Use cumulative portfolio value series
+        values = df.groupby(level=0)["value"].sum().astype(float)
+    except Exception:
+        return 0.5
+    if values.size < segments + 1:
+        return 0.5
+    # Build segment boundaries via indices split
+    idx_arrays = np.array_split(values.index, segments)
+    rois: list[float] = []
+    for idx in idx_arrays:
+        if len(idx) < 2:
+            continue
+        start_val = float(values.loc[idx[0]])
+        end_val = float(values.loc[idx[-1]])
+        if start_val <= 0:
+            continue
+        roi_seg = (end_val - start_val) / start_val
+        rois.append(roi_seg)
+    if len(rois) < 2:
+        return 0.5
+    mean_roi = float(np.mean(rois))
+    std_roi = float(np.std(rois))
+    if mean_roi == 0:
+        return 0.5
+    cv = std_roi / (abs(mean_roi) + 1e-9)
+    score = 1 / (1 + cv)
+    overall_roi = (values.iloc[-1] - values.iloc[0]) / max(values.iloc[0], 1e-9)
+    if overall_roi < 0:
+        score *= 0.5
     return float(max(0.0, min(1.0, score)))
 
 
