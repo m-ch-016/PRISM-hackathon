@@ -18,24 +18,35 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 10              #
-DIVERSITY_SCALE = 12        # typical range 6-12
+ROI_SCALE = 7              #
+DIVERSITY_SCALE = 0        # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
-RAR_SCALE = 2              # typical range 8-15
+RAR_SCALE = 15              # typical range 8-15
 DRAWDOWN_SCALE = 6          # typical range 3-8
 TAIL_RISK_SCALE = 5      # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 2            # typical range 0-3
-SKEWNESS_SCALE = 0          # typical range 0-4
-ENTROPY_SCALE = 0           # if entropy method: 6-12
-ROI_TRANSFORM: str = "sigmoid"  # Options: None | "log" | "sqrt" | "sigmoid"
-DIVERSITY_METHOD: str = "mse"
+SKEWNESS_SCALE = 1          # typical range 0-4
+ENTROPY_SCALE = 12           # if entropy method: 6-12
+ROI_TRANSFORM: str = "sqrt"  # Options: None | "log" | "sqrt" | "sigmoid"
+DIVERSITY_METHOD: str = "entropy"
 ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
 ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
 
+# High performing tickers (approx last 20y) that tend to dominate naive strategies.
+# We apply a gentle multiplicative penalty to discourage blindly stuffing these.
+# NOTE: This is a tuning surface; keep list short and update if regime changes.
+TOP_PERFORMERS_LAST_20Y: list[str] = [
+    "NVDA", "TSLA", "AAPL", "AMZN", "MSFT", "META", "GOOGL", "PLTR"
+]
+TOP_PERFORMER_PENALTY_ENABLED: bool = True
+TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.92  # per top-performer stock (compounds)
+TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.75  # floor so large counts don't erase score
+TOP_PERFORMER_PENALIZE_NEGATIVE: bool = False  # keep False so losses aren't reduced (no benefit)
+
 # Penalize portfolios that produce only a negligible positive profit ("farming" safety metrics).
-NEAR_ZERO_ROI_THRESHOLD = 0.005          # 0.5% ROI threshold below which profit is considered negligible
-NEAR_ZERO_ROI_PENALTY_FACTOR = 0.3      # Multiplicative penalty applied to points if ROI in (0, threshold)
+NEAR_ZERO_ROI_THRESHOLD = 0.01          # 1% ROI threshold below which profit is considered negligible
+NEAR_ZERO_ROI_PENALTY_FACTOR = 0.2      # Multiplicative penalty applied to points if ROI in (0, threshold)
 
 # Ultra-low volatility penalty (prevents parking in ultra-safe assets to farm metrics)
 LOW_VOL_PENALTY_ENABLED = True           # Toggle to enable ultra-low volatility penalty curve
@@ -52,7 +63,7 @@ RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration (ANNUALIZED intuitive value)
-CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.02
+CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.035
 TRADING_DAYS_PER_YEAR = 252
 # Backward compatible alias (deprecated): if other code references the old name.
 CLIENT_SAT_TARGET_VOL_DEFAULT = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT  # DEPRECATED alias
@@ -64,7 +75,7 @@ AGE_YOUNG_DIVISOR = 12  # (age - AGE_MIN) / AGE_YOUNG_DIVISOR for ramp up
 AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
 # Optional portfolio safety limits
-MAX_STOCKS_LIMIT: int | None = None  # e.g. 25 means only first 25 stocks count
+MAX_STOCKS_LIMIT: int = 25  # e.g. 25 means only first 25 stocks count
 MAX_POINTS_LIMIT: float = 500  # e.g. 10000 caps points to +/- 10000
 MIN_UNIQUE_STOCKS: int = 6  # e.g. 8 requires at least 8 distinct tickers for full points
 UNIQUE_PENALTY_EXPONENT: float = 1.8  # exponent >1 increases severity for concentrated portfolios
@@ -80,6 +91,12 @@ DEBUG = True
 LOG_FILE_DEFAULT = "prism_eval_debug.log"
 LOG_MAX_BYTES = 2 * 1024 * 1024  # 2MB per file
 LOG_BACKUP_COUNT = 3
+
+AGE_MIN = 18
+AGE_MAX = 80
+AGE_TOL_DEFAULT = 0.6
+EARLY_RANDOM_SCORE_DECIMALS = 1
+
 def _init_logging():
     """Initialize rotating file logging if DEBUG is enabled.
 
@@ -112,12 +129,6 @@ def _init_logging():
 
 # Initialize logging immediately if DEBUG is True (no CLI flag required)
 _init_logging()
-
-AGE_MIN = 18
-AGE_MAX = 80
-AGE_TOL_DEFAULT = 0.6
-EARLY_RANDOM_SCORE_DECIMALS = 1
-
 
 @dataclass
 class Context:
@@ -422,6 +433,22 @@ def get_points(
                     UNIQUE_PENALTY_EXPONENT,
                     penalty_factor,
                 )
+
+    # Top performer abuse mitigation: apply multiplicative penalty per included ticker.
+    try:
+        if TOP_PERFORMER_PENALTY_ENABLED:
+            top_set = set(TOP_PERFORMERS_LAST_20Y)
+            portfolio_tickers = {t for t, _ in stocks}
+            overlap_count = len(portfolio_tickers & top_set)
+            if overlap_count > 0 and (points > 0 or TOP_PERFORMER_PENALIZE_NEGATIVE):
+                raw_factor = TOP_PERFORMER_PENALTY_MULTIPLIER ** overlap_count
+                # Prevent factor from dropping below configured floor.
+                penalty_factor = max(TOP_PERFORMER_MAX_PENALTY_MULTIPLIER, raw_factor)
+                original_points = points
+                points *= penalty_factor
+    except Exception:
+        # Fail-safe: ignore any unexpected errors
+        pass
 
     # Apply max points safety cap if configured
     if MAX_POINTS_LIMIT is not None:
