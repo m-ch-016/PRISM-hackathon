@@ -19,14 +19,14 @@ warnings.filterwarnings("ignore")
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
 ROI_SCALE = 35              # ROI 
-DIVERSITY_SCALE = 10         # typical range 6-12
+DIVERSITY_SCALE = 12         # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
 RAR_SCALE = 15              # typical range 8-15
 DRAWDOWN_SCALE = 8          # typical range 3-8
 TAIL_RISK_SCALE = 8         # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 3            # typical range 0-3
-SKEWNESS_SCALE = 0          # typical range 0-4
+SKEWNESS_SCALE = 2          # typical range 0-4
 ENTROPY_SCALE = 8           # if entropy method: 6-12
 ROI_TRANSFORM: str | None = None  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "entropy"
@@ -73,7 +73,7 @@ CLIENT_SAT_TARGET_VOL_DEFAULT = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT  # DEPRECAT
 AGE_YOUNG = 30
 AGE_MID = 50
 AGE_YOUNG_DIVISOR = 12  # (age - AGE_MIN) / AGE_YOUNG_DIVISOR for ramp up
-AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
+AGE_OLD_DIVISOR = 30    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
 # Optional portfolio safety limits
 MAX_STOCKS_LIMIT: int = 15  # static fallback upper bound on counted stocks
