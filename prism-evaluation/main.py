@@ -14,12 +14,12 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 20              # typical range 10-25
-DIVERSITY_SCALE = 12        # typical range 6-12
-CLI_SAT_SCALE = 12          # typical range 6-15
+ROI_SCALE = 12              # typical range 10-25
+DIVERSITY_SCALE = 20        # typical range 6-12
+CLI_SAT_SCALE = 20          # typical range 6-15
 RAR_SCALE = 12              # typical range 8-15
 DRAWDOWN_SCALE = 3          # typical range 3-8
-TAIL_RISK_SCALE = 0         # enable 4-8 when used
+TAIL_RISK_SCALE = 7        # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 2            # typical range 0-3
 SKEWNESS_SCALE = 2          # typical range 0-4
@@ -30,11 +30,11 @@ ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
 ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
 
 # Employment status configuration
-UNEMPLOYED_RISK_FACTOR = 1.2
+UNEMPLOYED_RISK_FACTOR = 1.5
 
 # RANDOM VARIABLE
-RANDOM_MIN = -1.0  # Lower bound for random factor (before scaling)
-RANDOM_MAX = 1.0   # Upper bound for random factor (before scaling)
+RANDOM_MIN = -2.0  # Lower bound for random factor (before scaling)
+RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration
