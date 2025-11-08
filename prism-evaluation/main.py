@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 0              #
+ROI_SCALE = 10              #
 DIVERSITY_SCALE = 12        # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
 RAR_SCALE = 2              # typical range 8-15
@@ -934,6 +934,13 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
     if "context" not in data:
         print("context not passed through")
         return
+    # Debug trace of which API key is being used. We keep this out of stdout to avoid leaking
+    # credentials in protocol responses. If needed, adjust masking granularity.
+    try:
+        masked_key = api_key if len(api_key) <= 12 else f"{api_key[:6]}...{api_key[-4:]}"
+        logging.debug("polygon api key (masked): %s", masked_key)
+    except Exception:
+        pass
 
     with open(f"{args.basedir}/sic_industry.json", "r") as f:
         sic_industry = json.loads(f.read())
