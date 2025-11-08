@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 import warnings
+import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Set, Tuple, Union
 
@@ -13,9 +14,9 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 12
+ROI_SCALE = 20
 DIVERSITY_SCALE = 12
-CLI_SAT_SCALE = 20
+CLI_SAT_SCALE = 12
 RAR_SCALE = 12
 
 # Target Volatility configuration
@@ -30,11 +31,22 @@ AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 # Employment status configuration
 UNEMPLOYED_RISK_FACTOR = 1.2
 
+# Optional portfolio safety limits
+MAX_STOCKS_LIMIT: int | None = None  # e.g. 25 means only first 25 stocks count
+MAX_POINTS_LIMIT: float | None = None  # e.g. 10000 caps points to +/- 10000
+
+# Early random scoring (simple toggle). If enabled, final points are replaced
+# with a random float each run in the configured range.
+EARLY_RANDOM_SCORE_ENABLED: bool = True
+EARLY_RANDOM_SCORE_MIN = -30.0
+EARLY_RANDOM_SCORE_MAX = 10.0
+
 # DONT CHANGE
 DEBUG = False
 AGE_MIN = 18
 AGE_MAX = 80
 AGE_TOL_DEFAULT = 0.6
+EARLY_RANDOM_SCORE_DECIMALS = 1
 
 
 @dataclass
@@ -90,7 +102,7 @@ def get_tickers_agg_bars(
     return df, problematic_tickers
 
 
-def init_price_breaches_threshold(df: pd.DataFrame, threshold: float) -> (bool, float):
+def init_price_breaches_threshold(df: pd.DataFrame, threshold: float) -> tuple[bool, float]:
     value = df.groupby(level=1).first()["value"].sum()
     return (value > threshold, value)
 
@@ -237,8 +249,14 @@ def get_points(
         diff = abs(len(legal_stocks) - len(stocks))
         profit = -(0.1 * diff) * profit if profit > 0 else profit * (1 + (0.1 * diff))
         points = -(0.1 * diff) * points if points > 0 else points * (1 + (0.1 * diff))
+    # Final sign adjustment based on profit
+    points = points if profit > 0 else -abs(points)
 
-    return points if profit > 0 else -abs(points)
+    # Apply max points safety cap if configured
+    if MAX_POINTS_LIMIT is not None:
+        points = max(-MAX_POINTS_LIMIT, min(MAX_POINTS_LIMIT, points))
+
+    return points
 
 
 def return_on_investment(profit: float, context: Context) -> float:
@@ -439,6 +457,10 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
     for stock in data["stocks"]:
         stocks.append([stock["ticker"], stock["quantity"]])
 
+    # Enforce max stocks limit (ignore extras) before fetching data
+    if MAX_STOCKS_LIMIT is not None and len(stocks) > MAX_STOCKS_LIMIT:
+        stocks = stocks[:MAX_STOCKS_LIMIT]
+
     df, problematic_tickers = get_tickers_agg_bars(
         stocks_client,
         stocks,
@@ -463,6 +485,13 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
     passed, error_message, profit, points = evaluate(
         df, stocks, context, sic_industry, unique_industries, ref_client, args.basedir
     )
+
+    # Simple early random scoring override (always applies if enabled)
+    if EARLY_RANDOM_SCORE_ENABLED:
+        points = round(
+            random.uniform(EARLY_RANDOM_SCORE_MIN, EARLY_RANDOM_SCORE_MAX),
+            EARLY_RANDOM_SCORE_DECIMALS,
+        )
 
     print(
         json.dumps(
@@ -490,5 +519,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(e)
         sys.exit(1)
-
-        

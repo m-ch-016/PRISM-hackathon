@@ -74,3 +74,12 @@ $\mu$ is the average stock price in the portfolio over the given period.
 ## Risk-Adjusted Returns
 
 Calculated according to the mean average of the [Sharpe](https://en.wikipedia.org/wiki/Sharpe_ratio) and the [Sortino](https://www.investopedia.com/terms/s/sortinoratio.asp) ratios.
+
+## Safety Limits
+
+Two optional configuration values can be set at the top of `prism-evaluation/main.py` to constrain scoring:
+
+- `MAX_STOCKS_LIMIT`: If set to an integer (e.g. 25), only the first N submitted stocks are considered. Any additional stocks beyond this limit are ignored for pricing, profit and diversification.
+- `MAX_POINTS_LIMIT`: If set to a number (e.g. 10000), the final points output is capped to the range `[-MAX_POINTS_LIMIT, MAX_POINTS_LIMIT]` after all other adjustments.
+
+Leaving either as `None` disables that particular limit.
