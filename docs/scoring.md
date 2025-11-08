@@ -2,19 +2,22 @@
 
 _Deciding "how well" a player has performed in a round_
 
-The scoring system is designed to account for four separate parts of the
-challenge
+The scoring system is designed to account for several components of the
+challenge:
 
 - Return on Investment
 - Diversification of Portfolio
 - Client satisfaction
-- Risk-adjusted returns
+- Risk-adjusted returns (Sharpe / Sortino blend)
+- Drawdown resilience (lower maximum drawdown => higher score)
+- Random additive factor (stochastic noise term)
 
-The overall number of points allocated are a weighted sum of the above.
+The overall number of points allocated are a weighted sum of the above. A new
+drawdown term penalizes portfolios that experience deep peak-to-trough losses.
 
 $$
-\text{points} = \alpha\cdot \text{RoI} + \beta\cdot\text{Diversification} +
-\gamma\cdot\text{Client Satisfaction} + \delta\cdot\text{Sharpe}
+	ext{points} = \alpha\cdot \text{RoI} + \beta\cdot\text{Diversification} +
+\gamma\cdot\text{Client Satisfaction} + \delta\cdot\text{RiskAdj} + \epsilon\cdot\text{DrawdownScore} + \zeta\cdot\text{RandomNoise}
 $$
 
 ## Return on Investment
@@ -75,6 +78,26 @@ $\mu$ is the average stock price in the portfolio over the given period.
 
 Calculated according to the mean average of the [Sharpe](https://en.wikipedia.org/wiki/Sharpe_ratio) and the [Sortino](https://www.investopedia.com/terms/s/sortinoratio.asp) ratios.
 
+## Drawdown Resilience
+
+We define maximum drawdown (MDD) as the greatest peak-to-trough percentage decline
+in cumulative portfolio value over the evaluation window. The drawdown score is:
+
+$$
+	ext{DrawdownScore} = 1 - |\text{MDD}|
+$$
+
+Thus:
+- No drawdown (MDD = 0%) gives a score of 1.0.
+- A 30% max drawdown (MDD = -0.30) gives a score of 0.70.
+- A 100% drawdown bottoms at 0.0.
+
+If insufficient data points (<2) a neutral score of 0.5 is used. This score is
+scaled by an adjustable constant (e.g. `DRAWDOWN_SCALE`) in `main.py`.
+
+Rationale: Incorporating drawdown discourages brittle, high-volatility strategies
+that briefly spike returns but expose large downside risk.
+
 ## Safety Limits
 
 Two optional configuration values can be set at the top of `prism-evaluation/main.py` to constrain scoring:
@@ -83,3 +106,13 @@ Two optional configuration values can be set at the top of `prism-evaluation/mai
 - `MAX_POINTS_LIMIT`: If set to a number (e.g. 10000), the final points output is capped to the range `[-MAX_POINTS_LIMIT, MAX_POINTS_LIMIT]` after all other adjustments.
 
 Leaving either as `None` disables that particular limit.
+
+## Random Additive Factor
+
+An optional stochastic term can be added to reduce overfitting to fixed weights.
+It is sampled uniformly each evaluation from `[RANDOM_MIN, RANDOM_MAX]` and then
+multiplied by `RANDOM_SCALE` before inclusion in the total. Set `RANDOM_SCALE = 0`
+to disable. You can fix `RANDOM_SEED` for reproducible replay.
+
+This differs from the early override random scoring (which replaces the score).
+The additive factor only perturbs the final points.

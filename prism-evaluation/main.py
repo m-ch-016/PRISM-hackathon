@@ -18,6 +18,13 @@ ROI_SCALE = 20
 DIVERSITY_SCALE = 12
 CLI_SAT_SCALE = 12
 RAR_SCALE = 12
+DRAWDOWN_SCALE = 5
+
+# RANDOM VARIABLE
+RANDOM_SCALE = 1  # Weight for final random factor (set 0 to disable)
+RANDOM_MIN = -1.0  # Lower bound for random factor (before scaling)
+RANDOM_MAX = 1.0   # Upper bound for random factor (before scaling)
+RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration
 CLIENT_SAT_TARGET_VOL_DEFAULT = 0.08
@@ -228,15 +235,26 @@ def get_points(
     )
     client_sat = client_satisfaction(df, risk_profile(context), context.age)
     rar = risk_adjusted_returns(df, context, basedir)
+    drawdown = max_drawdown_score(df)
 
     if DEBUG:
         print(f"{roi=}", f"{diversity=}", f"{client_sat=}", f"{rar=}")
+
+    # Random additive factor (distinct from early override). Generates a value
+    # in [RANDOM_MIN, RANDOM_MAX] each evaluation and scales it. Use seed for reproducibility.
+    if RANDOM_SCALE != 0:
+        rng = random.Random(RANDOM_SEED) if RANDOM_SEED is not None else random
+        random_term = rng.uniform(RANDOM_MIN, RANDOM_MAX)
+    else:
+        random_term = 0.0
 
     points = (
         ROI_SCALE * roi
         + DIVERSITY_SCALE * diversity
         + CLI_SAT_SCALE * client_sat
         + RAR_SCALE * rar
+        + DRAWDOWN_SCALE * drawdown
+        + RANDOM_SCALE * random_term
     )
 
     value = df.groupby(level=1).first()["value"].sum()
@@ -257,6 +275,27 @@ def get_points(
         points = max(-MAX_POINTS_LIMIT, min(MAX_POINTS_LIMIT, points))
 
     return points
+
+
+def max_drawdown_score(df: pd.DataFrame) -> float:
+    """Return a drawdown score in [0,1].
+
+    Score is (1 - max_drawdown_fraction). A portfolio with 0% drawdown scores 1.0.
+    A 50% max drawdown scores 0.5. A 100% drawdown scores 0.0.
+    If insufficient data (<2 points) returns 0.5 as neutral.
+    """
+    try:
+        equity = df.groupby(level=0)["value"].sum().astype(float)
+    except Exception:
+        return 0.5
+    if equity.size < 2:
+        return 0.5
+    peak = np.maximum.accumulate(equity)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        drawdowns = (equity - peak) / peak
+    mdd = abs(np.nanmin(drawdowns)) if np.isfinite(np.nanmin(drawdowns)) else 0.0
+    score = 1 - mdd
+    return float(max(0.0, min(1.0, score)))
 
 
 def return_on_investment(profit: float, context: Context) -> float:
