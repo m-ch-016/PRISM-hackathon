@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 # see docs/scoring.md for more info
 ROI_SCALE = 25              # typical range 10-25
 DIVERSITY_SCALE = 10        # typical range 6-12
-CLI_SAT_SCALE = 20          # typical range 6-15
+CLI_SAT_SCALE = 15          # typical range 6-15
 RAR_SCALE = 5              # typical range 8-15
 DRAWDOWN_SCALE = 15          # typical range 3-8
 TAIL_RISK_SCALE = 7        # enable 4-8 when used
