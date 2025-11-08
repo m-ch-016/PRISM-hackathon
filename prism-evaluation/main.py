@@ -14,10 +14,10 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 30              #
-DIVERSITY_SCALE = 2        # typical range 6-12
-CLI_SAT_SCALE = 6          # typical range 6-15
-RAR_SCALE = 5              # typical range 8-15
+ROI_SCALE = 5              #
+DIVERSITY_SCALE = 12        # typical range 6-12
+CLI_SAT_SCALE = 10          # typical range 6-15
+RAR_SCALE = 10              # typical range 8-15
 DRAWDOWN_SCALE = 0          # typical range 3-8
 TAIL_RISK_SCALE = 2        # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
@@ -40,7 +40,7 @@ LOW_VOL_FLOOR_SCORE = 0.6                # Satisfaction score at (near) zero vol
 LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD = 0.75  # If risk_profile >= this, suppress or soften low-vol penalty
 
 # Employment status configuration
-UNEMPLOYED_RISK_FACTOR = 1.5
+UNEMPLOYED_RISK_FACTOR = 2
 
 # RANDOM VARIABLE
 RANDOM_MIN = -2.0  # Lower bound for random factor (before scaling)
@@ -48,7 +48,7 @@ RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration (ANNUALIZED intuitive value)
-CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.1
+CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.05
 TRADING_DAYS_PER_YEAR = 252
 # Backward compatible alias (deprecated): if other code references the old name.
 CLIENT_SAT_TARGET_VOL_DEFAULT = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT  # DEPRECATED alias
