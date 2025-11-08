@@ -70,14 +70,14 @@ func (h *HandlersConfig) InfoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !validKey {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("[api=%s] Error: %v\n", apiKey, err)
 		http.Error(w, "Unauthorized - invalid or missing X-API-Code header. You should have received on X-API-Code per team.", http.StatusUnauthorized)
 		return
 	}
 
 	row, err := h.db.QueryRow("select * from teams where api_key = $1", apiKey)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("[api=%s] Error: %v\n", apiKey, err)
 		http.Error(w, "Database error - could not query DB: "+err.Error()+"\n\nIf you see this error, please contact an event administrator.", http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +85,7 @@ func (h *HandlersConfig) InfoHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err = row.Scan(&user.ID, &user.APIKey, &user.TeamName, &user.Points, &user.Profit, &user.LastSubmissionTime)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("[api=%s] Error: %v\n", apiKey, err)
 		http.Error(w, "Unable to parse user information, contact administrator if this issue persists", http.StatusInternalServerError)
 		return
 	}
@@ -134,7 +134,7 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 			// Penalise
 			_, err = h.db.Exec("UPDATE teams SET profit = profit * 0.75, points = points * 0.75, last_submission_time = NOW() WHERE api_key = $1", apiKey)
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Printf("[api=%s] %v\n", apiKey, err)
 				http.Error(w, "An error was encountered updating the database, please reach out to the administrator if this keeps happening.", http.StatusInternalServerError)
 				return
 			}
@@ -174,7 +174,10 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	// Format with the port final number
 	url := fmt.Sprintf(base_url, port)
 	// Print serverside for debug
-	fmt.Printf("Requesting from %s\n", url)
+	if h.debug {
+		fmt.Printf("[api=%s] Requesting from %s\n", apiKey, url)
+	}
+
 	// Cycle through values 1,2,3,4
 	port = port%h.numLLMServers + 1
 	// Unlock
@@ -192,20 +195,20 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	//Read the response body
 	llm_resp, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading LLM response body:", err)
+		fmt.Println("[api=%s] Error reading LLM response body:", apiKey, err)
 		return
 	}
 	duration := time.Since(start)
 	duration.Seconds()
 	if h.debug {
-		fmt.Printf("LLM took %v to reply\n", duration)
+		fmt.Printf("[api=%s] LLM took %v to reply\n", apiKey, duration)
 	}
 
 	//Unmarshal the response into the LLMResponse struct
 	var llmResp LLMResponse
 	err = json.Unmarshal(llm_resp, &llmResp)
 	if err != nil {
-		fmt.Println("Error unmarshalling LLM response:", err)
+		fmt.Println("[api=%s] Error unmarshalling LLM response:", apiKey, err)
 		return
 	}
 
@@ -247,10 +250,6 @@ type EvaluationResponse struct {
 
 func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests.
-	if h.debug {
-		fmt.Printf("DEBUG: Method: %s, Path: %s\n", r.Method, r.URL.Path)
-	}
-
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -270,6 +269,10 @@ func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.debug {
+		fmt.Printf("[api=%s] DEBUG: Method: %s, Path: %s\n", apiKey, r.Method, r.URL.Path)
+	}
+
 	h.userContextMutex.Lock()
 	userContext, ok := h.userContext[apiKey]
 	// Remove key from map, as it has been consumed now. On error, ignores.
@@ -286,7 +289,8 @@ func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	// Check whether the context is fresh, i.e. the timestamp and TTL is after now.
 	if h.debug {
 		fmt.Printf(
-			"DEBUG: Timestamp: %v | TTL: %v | Now: %v\n",
+			"[api=%s] DEBUG: Timestamp: %v | TTL: %v | Now: %v\n",
+			apiKey,
 			userContext.Timestamp,
 			h.timeToLive,
 			time.Now(),
@@ -329,7 +333,7 @@ Example expected format:
 	subproc.Stdout = &out
 	subproc.Stderr = &out
 	if err = subproc.Run(); err != nil {
-		fmt.Printf("error: %v\n", err)
+		fmt.Printf("[api=%s] error: %v\n", apiKey, err)
 		http.Error(w, "Error during evaluation.", http.StatusInternalServerError)
 		return
 	}
@@ -337,7 +341,7 @@ Example expected format:
 	var response EvaluationResponse
 	err = json.Unmarshal([]byte(out.String()), &response)
 	if err != nil {
-		fmt.Printf("error: %v | %s\n", err, out.String())
+		fmt.Printf("[api=%s] error: %v | %s\n", apiKey, err, out.String())
 		http.Error(w, "Error during unmarshalling.", http.StatusInternalServerError)
 		return
 	}
@@ -348,7 +352,7 @@ Example expected format:
 				// Penalise profit and points to 0.95%.
 				_, err = h.db.Exec("UPDATE teams SET profit = profit * 0.75, points = points * 0.75, last_submission_time = NOW() WHERE api_key = $1", apiKey)
 				if err != nil {
-					fmt.Printf("%v\n", err)
+					fmt.Printf("[api=%s] %v\n", apiKey, err)
 					http.Error(w, "An error was encountered updating the database, please reach out to the administrator if this keeps happening.", http.StatusInternalServerError)
 					return
 				}
@@ -364,7 +368,7 @@ Example expected format:
 
 	_, err = h.db.Exec("UPDATE teams SET profit = profit + $1, points = points + $2, last_submission_time = NOW() WHERE api_key = $3", response.Profit, response.Points, apiKey)
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		fmt.Printf("[api=%s] %v\n", apiKey, err)
 		http.Error(w, "An error was encountered updating the database, please reach out to the administrator if this keeps happening.", http.StatusInternalServerError)
 		return
 	}
