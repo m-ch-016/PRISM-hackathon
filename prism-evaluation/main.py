@@ -3,12 +3,16 @@ import json
 import sys
 import warnings
 import random
+import logging
+import os
+from logging.handlers import RotatingFileHandler
 from dataclasses import dataclass
 from typing import Any, Dict, List, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from polygon import ReferenceClient, StocksClient
+
 
 warnings.filterwarnings("ignore")
 
@@ -70,8 +74,44 @@ EARLY_RANDOM_SCORE_ENABLED: bool = False
 EARLY_RANDOM_SCORE_MIN = -20.0
 EARLY_RANDOM_SCORE_MAX = 5.0
 
-# DONT CHANGE
-DEBUG = False
+# Debug / logging configuration
+DEBUG = True
+LOG_FILE_DEFAULT = "prism_eval_debug.log"
+LOG_MAX_BYTES = 2 * 1024 * 1024  # 2MB per file
+LOG_BACKUP_COUNT = 3
+def _init_logging():
+    """Initialize rotating file logging if DEBUG is enabled.
+
+    Safe to call multiple times (idempotent). Any exceptions are swallowed to
+    avoid breaking evaluation. Stdout remains clean for JSON output; only the
+    log file receives debug/info lines.
+    """
+    if not DEBUG:
+        return
+    try:
+        log_path = LOG_FILE_DEFAULT
+        # Create parent directory if user provided a path component
+        directory = os.path.dirname(log_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        handler = RotatingFileHandler(
+            log_path, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+        )
+        handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+        root = logging.getLogger()
+        # Prevent duplicate handlers
+        if not any(isinstance(h, RotatingFileHandler) for h in root.handlers):
+            root.addHandler(handler)
+        root.setLevel(logging.DEBUG)
+        logging.debug("logging initialized (DEBUG=%s, file=%s)", DEBUG, log_path)
+    except Exception:
+        # Intentionally ignore logging setup failures
+        pass
+
+
+# Initialize logging immediately if DEBUG is True (no CLI flag required)
+_init_logging()
+
 AGE_MIN = 18
 AGE_MAX = 80
 AGE_TOL_DEFAULT = 0.6
@@ -293,25 +333,24 @@ def get_points(
         random_term = 0.0
 
     if DEBUG:
-        print(
-            "[DEBUG] metrics:",
-            f"roi={roi:.4f}",
-            f"diversity_mse={diversity_mse:.4f}",
-            f"diversity_entropy={diversity_entropy:.4f}",
-            f"diversity_method={DIVERSITY_METHOD}",
-            f"client_sat={client_sat:.4f}",
-            f"rar={rar:.4f}",
-            f"drawdown={drawdown:.4f}",
-            f"tail_risk={tail_risk:.4f}",
-            f"regime_robustness={regime_robustness:.4f}",
-            f"skewness={skewness:.4f}",
-            f"random_term={random_term:.4f}",
+        logging.debug(
+            "metrics roi=%s diversity_mse=%s diversity_entropy=%s diversity_method=%s client_sat=%s rar=%s drawdown=%s tail_risk=%s regime_robustness=%s skewness=%s random_term=%s",
+            f"{roi:.4f}",
+            f"{diversity_mse:.4f}",
+            f"{diversity_entropy:.4f}",
+            DIVERSITY_METHOD,
+            f"{client_sat:.4f}",
+            f"{rar:.4f}",
+            f"{drawdown:.4f}",
+            f"{tail_risk:.4f}",
+            f"{regime_robustness:.4f}",
+            f"{skewness:.4f}",
+            f"{random_term:.4f}",
         )
-        # Portfolio composition (ticker:quantity)
-        print(
-            "[DEBUG] portfolio:",
+        logging.debug(
+            "portfolio %s",
             ", ".join(f"{t}:{q}" for t, q in stocks) or "<empty>",
-        ) 
+        )
 
     points = 0.0
     if ROI_SCALE != 0:
@@ -779,6 +818,8 @@ def evaluate(
     ref_client: ReferenceClient,
     basedir: str,
 ) -> Tuple[bool, str, float, int]:
+    if DEBUG:
+        logging.debug("evaluate called with %d stocks", len(stocks))
     # Check did not send multiple stocks
     if len(stocks) != len(set([s for s, _ in stocks])):
         return False, f"Error: duplicate tickers: {stocks}", 0.0, -1
@@ -810,6 +851,8 @@ def evaluate(
                 -1,
             )
         ticker_details[stock] = details
+        if DEBUG:
+            logging.debug("ticker_details loaded for %s", stock)
 
     # Remove stocks if they are not legal, so we only calculate using the legal stocks.
     legal_stocks = [
@@ -822,6 +865,8 @@ def evaluate(
         df.groupby(level=1).last()["value"].sum()
         - df.groupby(level=1).first()["value"].sum()
     )
+    if DEBUG:
+        logging.debug("raw profit computed: %s", profit)
 
     # Early random scoring short-circuit: generate points immediately and skip metrics
     if EARLY_RANDOM_SCORE_ENABLED:
@@ -843,7 +888,34 @@ def evaluate(
         ticker_details,
     )
 
+    if DEBUG:
+        logging.debug("evaluation complete profit=%s points=%s", profit, points)
     return True, "", profit, points
+
+
+def init_logging(debug: bool, logfile: str | None = None):
+    """Initialize rotating file logging without polluting stdout.
+
+    Stdout is reserved for JSON protocol responses. All diagnostic output goes to the
+    specified log file. Use --debug for DEBUG level; otherwise INFO is used. Errors
+    still propagate via exceptions / stdout JSON payload.
+    """
+    level = logging.DEBUG if debug else logging.INFO
+    log_path = logfile or LOG_FILE_DEFAULT
+    # Ensure directory exists
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True) if os.path.dirname(log_path) else None
+    except Exception:
+        pass
+    handler = RotatingFileHandler(log_path, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8")
+    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+    handler.setFormatter(fmt)
+    root = logging.getLogger()
+    # Avoid duplicate handlers if re-init (e.g. in tests)
+    if not any(isinstance(h, RotatingFileHandler) for h in root.handlers):
+        root.addHandler(handler)
+    root.setLevel(level)
+    logging.info("Logging initialized debug=%s file=%s", debug, log_path)
 
 
 def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
@@ -909,6 +981,8 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
             }
         )
     )
+    if DEBUG:
+        logging.debug("JSON output emitted")
 
 
 if __name__ == "__main__":
