@@ -27,7 +27,7 @@ TAIL_RISK_SCALE = 7      # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 2            # typical range 0-3
 SKEWNESS_SCALE = 1          # typical range 0-4
-ENTROPY_SCALE = 12           # if entropy method: 6-12
+ENTROPY_SCALE = 6           # if entropy method: 6-12
 ROI_TRANSFORM: str = "sqrt"  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "entropy"
 ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
@@ -45,7 +45,7 @@ TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.4  # floor so large counts don't
 TOP_PERFORMER_PENALIZE_NEGATIVE: bool = False  # keep False so losses aren't reduced (no benefit)
 
 # Penalize portfolios that produce only a negligible positive profit ("farming" safety metrics).
-NEAR_ZERO_ROI_THRESHOLD = 0.01          # 1% ROI threshold below which profit is considered negligible
+NEAR_ZERO_ROI_THRESHOLD = 0.02          # 1% ROI threshold below which profit is considered negligible
 NEAR_ZERO_ROI_PENALTY_FACTOR = 0.2      # Multiplicative penalty applied to points if ROI in (0, threshold)
 
 # Ultra-low volatility penalty (prevents parking in ultra-safe assets to farm metrics)
