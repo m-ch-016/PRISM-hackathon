@@ -14,17 +14,17 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 6              # typical range 10-25
+ROI_SCALE = 15              # typical range 10-25
 DIVERSITY_SCALE = 12        # typical range 6-12
 CLI_SAT_SCALE = 20          # typical range 6-15
 RAR_SCALE = 12              # typical range 8-15
-DRAWDOWN_SCALE = 3          # typical range 3-8
+DRAWDOWN_SCALE = 15          # typical range 3-8
 TAIL_RISK_SCALE = 7        # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 2            # typical range 0-3
 SKEWNESS_SCALE = 0          # typical range 0-4
 ENTROPY_SCALE = 0           # if entropy method: 6-12
-ROI_TRANSFORM: str | None = None  # Options: None | "log" | "sqrt" | "sigmoid"
+ROI_TRANSFORM: str = "sigmoid"  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "mse"
 ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
 ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
@@ -38,7 +38,7 @@ RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration
-CLIENT_SAT_TARGET_VOL_DEFAULT = 0.08
+CLIENT_SAT_TARGET_VOL_DEFAULT = 0.05
 
 # Age tolerance configuration
 AGE_YOUNG = 30
@@ -48,7 +48,7 @@ AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
 # Optional portfolio safety limits
 MAX_STOCKS_LIMIT: int | None = None  # e.g. 25 means only first 25 stocks count
-MAX_POINTS_LIMIT: float | None = None  # e.g. 10000 caps points to +/- 10000
+MAX_POINTS_LIMIT: float = 500  # e.g. 10000 caps points to +/- 10000
 MIN_UNIQUE_STOCKS: int | None = None  # e.g. 8 requires at least 8 distinct tickers for full points
 
 # Early random scoring (simple toggle). If enabled, final points are replaced
