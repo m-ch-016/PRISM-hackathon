@@ -40,8 +40,8 @@ TOP_PERFORMERS_LAST_20Y: list[str] = [
     "NVDA", "TSLA", "AAPL", "AMZN", "MSFT", "META", "GOOGL", "PLTR"
 ]
 TOP_PERFORMER_PENALTY_ENABLED: bool = True
-TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.95  # per top-performer stock (compounds)
-TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.75  # floor so large counts don't erase score
+TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.9  # per top-performer stock (compounds)
+TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.5  # floor so large counts don't erase score
 TOP_PERFORMER_PENALIZE_NEGATIVE: bool = False  # keep False so losses aren't reduced (no benefit)
 
 # Penalize portfolios that produce only a negligible positive profit ("farming" safety metrics).
@@ -63,7 +63,7 @@ RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration (ANNUALIZED intuitive value)
-CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.04
+CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.12  # 15% annual volatility target
 TRADING_DAYS_PER_YEAR = 252
 # Backward compatible alias (deprecated): if other code references the old name.
 CLIENT_SAT_TARGET_VOL_DEFAULT = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT  # DEPRECATED alias
@@ -771,8 +771,12 @@ def client_satisfaction(
               Between low_band and tolerance -> ramp 0.95 -> 1.0.
               Above tolerance -> linear decay (1 - (excess/tolerance)).
     """
-    # Daily returns
-    r = df["value"].pct_change().dropna()
+    # Aggregate portfolio value per day (sum across tickers) before computing daily returns.
+    try:
+        daily_equity = df.groupby(level=0)["value"].sum().astype(float)
+    except Exception:
+        return 0.0
+    r = daily_equity.pct_change().dropna()
     if r.size == 0:
         return 0.0
     portfolio_vol = r.std()
