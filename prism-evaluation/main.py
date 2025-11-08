@@ -76,7 +76,7 @@ AGE_OLD_DIVISOR = 30    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
 # Optional portfolio safety limits
 MAX_STOCKS_LIMIT: int = 15  # static fallback upper bound on counted stocks
-MAX_POINTS_LIMIT: float = 1000  # e.g. 10000 caps points to +/- 10000
+MAX_POINTS_LIMIT: float = 1500  # e.g. 10000 caps points to +/- 10000
 MIN_UNIQUE_STOCKS: int = 8  # static fallback minimum distinct tickers for full points
 UNIQUE_PENALTY_EXPONENT: float = 1.8  # exponent >1 increases severity for concentrated portfolios
 
