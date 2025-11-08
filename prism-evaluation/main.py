@@ -14,8 +14,8 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 15              # typical range 10-25
-DIVERSITY_SCALE = 10        # typical range 6-12
+ROI_SCALE = 12              # typical range 10-25
+DIVERSITY_SCALE = 15        # typical range 6-12
 CLI_SAT_SCALE = 20          # typical range 6-15
 RAR_SCALE = 12              # typical range 8-15
 DRAWDOWN_SCALE = 15          # typical range 3-8
@@ -290,7 +290,7 @@ def get_points(
         print(
             "[DEBUG] portfolio:",
             ", ".join(f"{t}:{q}" for t, q in stocks) or "<empty>"
-        )
+        ) 
 
     points = 0.0
     if ROI_SCALE != 0:
