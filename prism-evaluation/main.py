@@ -19,10 +19,10 @@ DIVERSITY_SCALE = 8        # typical range 6-12
 CLI_SAT_SCALE = 5          # typical range 6-15
 RAR_SCALE = 5              # typical range 8-15
 DRAWDOWN_SCALE = 15          # typical range 3-8
-TAIL_RISK_SCALE = 7        # enable 4-8 when used
+TAIL_RISK_SCALE = 8        # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 3            # typical range 0-3
-SKEWNESS_SCALE = 3          # typical range 0-4
+SKEWNESS_SCALE = 4          # typical range 0-4
 ENTROPY_SCALE = 0           # if entropy method: 6-12
 ROI_TRANSFORM: str | None = None  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "mse"
@@ -38,7 +38,7 @@ RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration
-CLIENT_SAT_TARGET_VOL_DEFAULT = 0.05
+CLIENT_SAT_TARGET_VOL_DEFAULT = 0.03
 
 # Age tolerance configuration
 AGE_YOUNG = 30
