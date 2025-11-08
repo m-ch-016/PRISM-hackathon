@@ -75,10 +75,21 @@ AGE_YOUNG_DIVISOR = 12  # (age - AGE_MIN) / AGE_YOUNG_DIVISOR for ramp up
 AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
 # Optional portfolio safety limits
-MAX_STOCKS_LIMIT: int = 15  # e.g. 25 means only first 25 stocks count
+MAX_STOCKS_LIMIT: int = 15  # static fallback upper bound on counted stocks
 MAX_POINTS_LIMIT: float = 500  # e.g. 10000 caps points to +/- 10000
-MIN_UNIQUE_STOCKS: int = 8  # e.g. 8 requires at least 8 distinct tickers for full points
+MIN_UNIQUE_STOCKS: int = 8  # static fallback minimum distinct tickers for full points
 UNIQUE_PENALTY_EXPONENT: float = 1.8  # exponent >1 increases severity for concentrated portfolios
+
+# Dynamic stock limit configuration (randomized per run to discourage hard-coding strategies).
+# When enabled, runtime chosen values override the static constants above.
+DYNAMIC_STOCK_LIMITS_ENABLED: bool = True
+MAX_STOCKS_LIMIT_RANGE: tuple[int, int] = (12, 18)  # inclusive range for maximum stocks counted
+MIN_UNIQUE_STOCKS_RANGE: tuple[int, int] = (6, 10)  # inclusive range for minimum unique required
+DYNAMIC_LIMITS_SEED: int | None = None  # set an int for deterministic selection (e.g. during testing)
+
+# Runtime-selected limits (populated in main()).
+RUNTIME_MAX_STOCKS_LIMIT: int | None = None
+RUNTIME_MIN_UNIQUE_STOCKS: int | None = None
 
 # Early random scoring (simple toggle). If enabled, final points are replaced
 # with a random float each run in the configured range.
@@ -419,17 +430,19 @@ def get_points(
 
     # Late concentration penalty (applies after sign + all additive components but before capping).
     # Strongly penalizes portfolios with fewer than MIN_UNIQUE_STOCKS by an exponential factor.
-    if MIN_UNIQUE_STOCKS is not None and MIN_UNIQUE_STOCKS > 0:
+    # Resolve effective dynamic minimum unique stocks.
+    effective_min_unique = RUNTIME_MIN_UNIQUE_STOCKS if RUNTIME_MIN_UNIQUE_STOCKS is not None else MIN_UNIQUE_STOCKS
+    if effective_min_unique is not None and effective_min_unique > 0:
         unique_count = len({s for s, _ in stocks})
-        if unique_count < MIN_UNIQUE_STOCKS and unique_count > 0:
-            scarcity_ratio = unique_count / MIN_UNIQUE_STOCKS
+        if unique_count < effective_min_unique and unique_count > 0:
+            scarcity_ratio = unique_count / effective_min_unique
             penalty_factor = scarcity_ratio ** UNIQUE_PENALTY_EXPONENT
             points *= penalty_factor
             if DEBUG:
                 logging.debug(
                     "concentration penalty applied unique_count=%s min_required=%s exponent=%s factor=%.4f",
                     unique_count,
-                    MIN_UNIQUE_STOCKS,
+                    effective_min_unique,
                     UNIQUE_PENALTY_EXPONENT,
                     penalty_factor,
                 )
@@ -985,9 +998,45 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
     for stock in data["stocks"]:
         stocks.append([stock["ticker"], stock["quantity"]])
 
+    # Initialize dynamic limits once per run.
+    global RUNTIME_MAX_STOCKS_LIMIT, RUNTIME_MIN_UNIQUE_STOCKS
+    if DYNAMIC_STOCK_LIMITS_ENABLED:
+        try:
+            rng_dyn = random.Random(DYNAMIC_LIMITS_SEED) if DYNAMIC_LIMITS_SEED is not None else random
+            max_low, max_high = MAX_STOCKS_LIMIT_RANGE
+            min_low, min_high = MIN_UNIQUE_STOCKS_RANGE
+            chosen_max = rng_dyn.randint(max_low, max_high)
+            chosen_min = rng_dyn.randint(min_low, min_high)
+            # Ensure consistency: min unique cannot exceed chosen max.
+            if chosen_min > chosen_max:
+                chosen_min = chosen_max - 1 if chosen_max > 1 else 1
+            # Never drop below 2 (portfolio needs diversity logic to engage meaningfully)
+            chosen_min = max(2, chosen_min)
+            RUNTIME_MAX_STOCKS_LIMIT = chosen_max
+            RUNTIME_MIN_UNIQUE_STOCKS = chosen_min
+            logging.debug(
+                "dynamic limits selected max_stocks=%s min_unique=%s (ranges max=%s min=%s seed=%s)",
+                RUNTIME_MAX_STOCKS_LIMIT,
+                RUNTIME_MIN_UNIQUE_STOCKS,
+                MAX_STOCKS_LIMIT_RANGE,
+                MIN_UNIQUE_STOCKS_RANGE,
+                DYNAMIC_LIMITS_SEED,
+            )
+        except Exception:
+            # Fallback to static if something unexpected occurs.
+            RUNTIME_MAX_STOCKS_LIMIT = MAX_STOCKS_LIMIT
+            RUNTIME_MIN_UNIQUE_STOCKS = MIN_UNIQUE_STOCKS
+            logging.debug("dynamic limit selection failed; falling back to static limits")
+    else:
+        RUNTIME_MAX_STOCKS_LIMIT = MAX_STOCKS_LIMIT
+        RUNTIME_MIN_UNIQUE_STOCKS = MIN_UNIQUE_STOCKS
+
+    effective_max_stocks = RUNTIME_MAX_STOCKS_LIMIT if RUNTIME_MAX_STOCKS_LIMIT is not None else MAX_STOCKS_LIMIT
     # Enforce max stocks limit (ignore extras) before fetching data
-    if MAX_STOCKS_LIMIT is not None and len(stocks) > MAX_STOCKS_LIMIT:
-        stocks = stocks[:MAX_STOCKS_LIMIT]
+    if effective_max_stocks is not None and len(stocks) > effective_max_stocks:
+        stocks = stocks[:effective_max_stocks]
+        if DEBUG:
+            logging.debug("portfolio truncated to effective_max_stocks=%s", effective_max_stocks)
 
     df, problematic_tickers = get_tickers_agg_bars(
         stocks_client,
