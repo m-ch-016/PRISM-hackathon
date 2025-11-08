@@ -62,7 +62,7 @@ AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 # Optional portfolio safety limits
 MAX_STOCKS_LIMIT: int | None = None  # e.g. 25 means only first 25 stocks count
 MAX_POINTS_LIMIT: float = 500  # e.g. 10000 caps points to +/- 10000
-MIN_UNIQUE_STOCKS: int | None = None  # e.g. 8 requires at least 8 distinct tickers for full points
+MIN_UNIQUE_STOCKS: int = 6  # e.g. 8 requires at least 8 distinct tickers for full points
 
 # Early random scoring (simple toggle). If enabled, final points are replaced
 # with a random float each run in the configured range.
