@@ -14,12 +14,12 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 40              # typical range 10-25
-DIVERSITY_SCALE = 3        # typical range 6-12
-CLI_SAT_SCALE = 5          # typical range 6-15
+ROI_SCALE = 20              #
+DIVERSITY_SCALE = 5        # typical range 6-12
+CLI_SAT_SCALE = 10          # typical range 6-15
 RAR_SCALE = 1              # typical range 8-15
-DRAWDOWN_SCALE = 2          # typical range 3-8
-TAIL_RISK_SCALE = 1        # enable 4-8 when used
+DRAWDOWN_SCALE = 10          # typical range 3-8
+TAIL_RISK_SCALE = 10        # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 3            # typical range 0-3
 SKEWNESS_SCALE = 4          # typical range 0-4
@@ -294,6 +294,7 @@ def get_points(
 
     points = 0.0
     if ROI_SCALE != 0:
+        # ROI now primary driver; scale raised. ROI = profit / budget (possibly transformed).
         points += ROI_SCALE * roi
     if DIVERSITY_METHOD == "mse" and DIVERSITY_SCALE != 0:
         points += DIVERSITY_SCALE * diversity_mse
@@ -322,8 +323,17 @@ def get_points(
             scarcity_factor = unique_count / MIN_UNIQUE_STOCKS
             points *= max(0.0, scarcity_factor)
 
-    value = df.groupby(level=1).first()["value"].sum()
-    points *= 1 - (value / context.budget)
+    # Previous logic zeroed points when utilization ~ 100% (points *= 1 - invested/budget).
+    # Replace with mild idle cash penalty: up to 10% reduction if large uninvested cash.
+    try:
+        value = df.groupby(level=1).first()["value"].sum()
+        utilization = value / max(1e-9, context.budget)
+        idle_fraction = max(0.0, 1 - utilization)  # portion of budget not deployed
+        # Apply at most 10% penalty linearly with idle fraction.
+        points *= (1 - 0.10 * idle_fraction)
+    except Exception:
+        # If anything fails, skip penalty to avoid wiping ROI impact.
+        pass
 
     points = points * 10  # make a nicer scale for points
 
