@@ -14,15 +14,15 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 20              # typical range 10-25
+ROI_SCALE = 25              # typical range 10-25
 DIVERSITY_SCALE = 10        # typical range 6-12
 CLI_SAT_SCALE = 20          # typical range 6-15
-RAR_SCALE = 12              # typical range 8-15
+RAR_SCALE = 5              # typical range 8-15
 DRAWDOWN_SCALE = 15          # typical range 3-8
 TAIL_RISK_SCALE = 7        # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 2            # typical range 0-3
-SKEWNESS_SCALE = 0          # typical range 0-4
+SKEWNESS_SCALE = 3          # typical range 0-4
 ENTROPY_SCALE = 0           # if entropy method: 6-12
 ROI_TRANSFORM: str = "sigmoid"  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "mse"
