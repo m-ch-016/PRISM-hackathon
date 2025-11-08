@@ -40,8 +40,8 @@ TOP_PERFORMERS_LAST_20Y: list[str] = [
     "NVDA", "TSLA", "AAPL", "AMZN", "MSFT", "META", "GOOGL", "PLTR"
 ]
 TOP_PERFORMER_PENALTY_ENABLED: bool = True
-TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.92  # per top-performer stock (compounds)
-TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.6  # floor so large counts don't erase score
+TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.8  # per top-performer stock (compounds)
+TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.4  # floor so large counts don't erase score
 TOP_PERFORMER_PENALIZE_NEGATIVE: bool = False  # keep False so losses aren't reduced (no benefit)
 
 # Penalize portfolios that produce only a negligible positive profit ("farming" safety metrics).
