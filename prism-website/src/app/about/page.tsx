@@ -108,7 +108,7 @@ export default function AboutPage() {
 
               <h4 className="text-lg font-semibold mb-2">Service Connection</h4>
               <ul className="list-none ml-4 space-y-1 mb-4">
-                <li><strong>Connect to </strong> http://quants-uom-prism.online:PORT </li>
+                <li><strong>Connect to </strong> http://www.prism-challenge.com/:PORT </li>
                 <li><strong>Port 80:</strong> Competition information website</li>
                 <li><strong>Port 8082:</strong> Main server for API interactions</li>
               </ul>
