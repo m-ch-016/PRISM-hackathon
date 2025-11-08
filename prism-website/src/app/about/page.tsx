@@ -142,7 +142,7 @@ export default function AboutPage() {
               <h3 className="text-lg font-semibold mb-2">Starter Script</h3>
               <div className="w-full h-[1000px]">
                 <iframe
-                  src="https://pastebin.com/embed_iframe/2F45tn5t?theme=dark"
+                  src="https://pastebin.com/embed_iframe/MXDWNy9J?theme=dark"
                   className="w-full h-full border-0"
                 ></iframe>
               </div>

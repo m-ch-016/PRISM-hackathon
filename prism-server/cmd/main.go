@@ -38,7 +38,8 @@ func main() {
 	ppwd := flag.String("ppwd", "", "Postgres password")
 	apikey := flag.String("apikey", "", "Api key for polygon")
 	evalDir := flag.String("eval-dir", defaultEvaluationDir, "Evaluation directory path")
-	numLLMServer := flag.Int("numLLMServer", defaultNumLLMServers, "Number of LLM servers stood up")
+	debug := flag.Bool("debug", false, "Whether to enable debugging")
+	numLLMServer := flag.Int("numLLMServer", defaultNumLLMServers, "Number of LLM servers stood up (0 disables LLMs)")
 	maxDeltaSpamTime := flag.Int("maxDeltaSpamTime", defaultMaxDeltaSpamTime, "The number of seconds of window from last request to be considered spam. Prevents LLM GPU overuse.")
 	connectionCount := flag.Int("connectionCount", defaultConnectionCount, "The max concurrent connections")
 	flag.Parse()
@@ -54,7 +55,7 @@ func main() {
 	// Map API keys to contexts from requests
 	userContext := make(map[string]*internal.RequestContext)
 
-	handlers := internal.NewHandlers(&db, userContext, time.Duration(*maxDeltaSpamTime)*time.Second, time.Duration(*ttl)*time.Millisecond, *evalDir, *apikey, *numLLMServer)
+	handlers := internal.NewHandlers(&db, userContext, time.Duration(*maxDeltaSpamTime)*time.Second, time.Duration(*ttl)*time.Millisecond, *evalDir, *apikey, *numLLMServer, *debug)
 
 	// HTTP Handler for client answers.
 	http.HandleFunc("/submit", handlers.PostHandler)

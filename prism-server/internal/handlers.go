@@ -1,15 +1,15 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
-	_ "io"
-	_ "bytes"
 )
 
 var port int = 1
@@ -39,10 +39,12 @@ type HandlersConfig struct {
 	evalDir          string
 	apiKey           string
 	numLLMServers    int
+	enabledLLM       bool // Whether LLMs are enabled
+	debug            bool // Whether debug logging enabled
 }
 
-func NewHandlers(db *Database, uc map[string]*RequestContext, maxDeltaSpamTime time.Duration, timeToLive time.Duration, evalDir string, apiKey string, numLLMServers int) HandlersConfig {
-	return HandlersConfig{db, uc, make(map[string]time.Time, 0), maxDeltaSpamTime, sync.RWMutex{}, sync.RWMutex{}, timeToLive, evalDir, apiKey, numLLMServers}
+func NewHandlers(db *Database, uc map[string]*RequestContext, maxDeltaSpamTime time.Duration, timeToLive time.Duration, evalDir string, apiKey string, numLLMServers int, debug bool) HandlersConfig {
+	return HandlersConfig{db, uc, make(map[string]time.Time, 0), maxDeltaSpamTime, sync.RWMutex{}, sync.RWMutex{}, timeToLive, evalDir, apiKey, numLLMServers, numLLMServers != 0, debug}
 }
 
 type User struct {
@@ -166,7 +168,6 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	       - 8006
 	    Locks around the port update since it is shared amongst goroutines that all serve the go HTTP server (i think)
 	*/
-	/*
 	h.pyServerMutex.Lock()
 	// Base URL
 	base_url := "http://prism-llm:800%d/generate"
@@ -178,7 +179,6 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	port = port%h.numLLMServers + 1
 	// Unlock
 	h.pyServerMutex.Unlock()
-
 
 	start := time.Now()
 	//Make the request
@@ -195,10 +195,11 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error reading LLM response body:", err)
 		return
 	}
-        duration := time.Since(start)
+	duration := time.Since(start)
 	duration.Seconds()
-	fmt.Printf("LLM took %v to reply\n", duration)
-
+	if h.debug {
+		fmt.Printf("LLM took %v to reply\n", duration)
+	}
 
 	//Unmarshal the response into the LLMResponse struct
 	var llmResp LLMResponse
@@ -209,12 +210,15 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Set the message to be just the "body" of the response
-	resp_to_user := Response{
-		Message: llmResp.Body,
-	}
-	*/
-	resp_to_user := Response{
-		Message: string(content),
+	var resp_to_user Response
+	if h.enabledLLM {
+		resp_to_user = Response{
+			Message: llmResp.Body,
+		}
+	} else {
+		resp_to_user = Response{
+			Message: string(content),
+		}
 	}
 
 	// Map context to the individual user, identified by their API token.
@@ -243,12 +247,13 @@ type EvaluationResponse struct {
 
 func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests.
-	fmt.Printf("DEBUG: Method: %s, Path: %s\n", r.Method, r.URL.Path)
-
+	if h.debug {
+		fmt.Printf("DEBUG: Method: %s, Path: %s\n", r.Method, r.URL.Path)
+	}
 
 	if r.Method != http.MethodPost {
-    	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-    	return
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
 	// TODO: This code is duplicated, we should move this into its own function.
@@ -279,12 +284,14 @@ func (h *HandlersConfig) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check whether the context is fresh, i.e. the timestamp and TTL is after now.
-	fmt.Printf(
-		"DEBUG: Timestamp: %v | TTL: %v | Now: %v\n",
-		userContext.Timestamp,
-		h.timeToLive,
-		time.Now(),
-	)
+	if h.debug {
+		fmt.Printf(
+			"DEBUG: Timestamp: %v | TTL: %v | Now: %v\n",
+			userContext.Timestamp,
+			h.timeToLive,
+			time.Now(),
+		)
+	}
 
 	if !userContext.Timestamp.Add(h.timeToLive).After(time.Now()) {
 		http.Error(w, "Context expired, you responded too slowly boohoo :(... Try again with a faster computer :P.", http.StatusTeapot)
