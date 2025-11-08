@@ -67,6 +67,7 @@ AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 MAX_STOCKS_LIMIT: int | None = None  # e.g. 25 means only first 25 stocks count
 MAX_POINTS_LIMIT: float = 500  # e.g. 10000 caps points to +/- 10000
 MIN_UNIQUE_STOCKS: int = 6  # e.g. 8 requires at least 8 distinct tickers for full points
+UNIQUE_PENALTY_EXPONENT: float = 1.8  # exponent >1 increases severity for concentrated portfolios
 
 # Early random scoring (simple toggle). If enabled, final points are replaced
 # with a random float each run in the configured range.
@@ -375,14 +376,6 @@ def get_points(
     if SKEWNESS_SCALE != 0:
         points += SKEWNESS_SCALE * skewness
 
-    # Enforce minimum unique stocks requirement (multiplicative penalty if below)
-    if MIN_UNIQUE_STOCKS is not None and MIN_UNIQUE_STOCKS > 0:
-        unique_count = len({s for s, _ in stocks})
-        if unique_count < MIN_UNIQUE_STOCKS:
-            # Scale points down proportionally to coverage; avoid negative flip here
-            scarcity_factor = unique_count / MIN_UNIQUE_STOCKS
-            points *= max(0.0, scarcity_factor)
-
     # Previous logic zeroed points when utilization ~ 100% (points *= 1 - invested/budget).
     # Replace with mild idle cash penalty: up to 10% reduction if large uninvested cash.
     try:
@@ -412,6 +405,23 @@ def get_points(
         points = -(0.1 * diff) * points if points > 0 else points * (1 + (0.1 * diff))
     # Final sign adjustment based on profit
     points = points if profit > 0 else -abs(points)
+
+    # Late concentration penalty (applies after sign + all additive components but before capping).
+    # Strongly penalizes portfolios with fewer than MIN_UNIQUE_STOCKS by an exponential factor.
+    if MIN_UNIQUE_STOCKS is not None and MIN_UNIQUE_STOCKS > 0:
+        unique_count = len({s for s, _ in stocks})
+        if unique_count < MIN_UNIQUE_STOCKS and unique_count > 0:
+            scarcity_ratio = unique_count / MIN_UNIQUE_STOCKS
+            penalty_factor = scarcity_ratio ** UNIQUE_PENALTY_EXPONENT
+            points *= penalty_factor
+            if DEBUG:
+                logging.debug(
+                    "concentration penalty applied unique_count=%s min_required=%s exponent=%s factor=%.4f",
+                    unique_count,
+                    MIN_UNIQUE_STOCKS,
+                    UNIQUE_PENALTY_EXPONENT,
+                    penalty_factor,
+                )
 
     # Apply max points safety cap if configured
     if MAX_POINTS_LIMIT is not None:
