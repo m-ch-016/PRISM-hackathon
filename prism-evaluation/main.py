@@ -53,7 +53,7 @@ MIN_UNIQUE_STOCKS: int | None = None  # e.g. 8 requires at least 8 distinct tick
 
 # Early random scoring (simple toggle). If enabled, final points are replaced
 # with a random float each run in the configured range.
-EARLY_RANDOM_SCORE_ENABLED: bool = True
+EARLY_RANDOM_SCORE_ENABLED: bool = False
 EARLY_RANDOM_SCORE_MIN = -20.0
 EARLY_RANDOM_SCORE_MAX = 5.0
 
