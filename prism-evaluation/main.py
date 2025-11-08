@@ -30,7 +30,7 @@ ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
 ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
 
 # Employment status configuration
-UNEMPLOYED_RISK_FACTOR = 1.5
+UNEMPLOYED_RISK_FACTOR = 1.2
 
 # RANDOM VARIABLE
 RANDOM_MIN = -2.0  # Lower bound for random factor (before scaling)
