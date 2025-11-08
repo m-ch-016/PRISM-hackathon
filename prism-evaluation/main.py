@@ -18,13 +18,13 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 7              #
+ROI_SCALE = 0              #
 DIVERSITY_SCALE = 0        # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
-RAR_SCALE = 12              # typical range 8-15
+RAR_SCALE = 8              # typical range 8-15
 DRAWDOWN_SCALE = 6          # typical range 3-8
 TAIL_RISK_SCALE = 7      # enable 4-8 when used
-REGIME_ROBUSTNESS_SCALE = 5 # enable 6-10 when used
+REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 2            # typical range 0-3
 SKEWNESS_SCALE = 1          # typical range 0-4
 ENTROPY_SCALE = 12           # if entropy method: 6-12
@@ -75,9 +75,9 @@ AGE_YOUNG_DIVISOR = 12  # (age - AGE_MIN) / AGE_YOUNG_DIVISOR for ramp up
 AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
 # Optional portfolio safety limits
-MAX_STOCKS_LIMIT: int = 25  # e.g. 25 means only first 25 stocks count
+MAX_STOCKS_LIMIT: int = 15  # e.g. 25 means only first 25 stocks count
 MAX_POINTS_LIMIT: float = 500  # e.g. 10000 caps points to +/- 10000
-MIN_UNIQUE_STOCKS: int = 6  # e.g. 8 requires at least 8 distinct tickers for full points
+MIN_UNIQUE_STOCKS: int = 8  # e.g. 8 requires at least 8 distinct tickers for full points
 UNIQUE_PENALTY_EXPONENT: float = 1.8  # exponent >1 increases severity for concentrated portfolios
 
 # Early random scoring (simple toggle). If enabled, final points are replaced
