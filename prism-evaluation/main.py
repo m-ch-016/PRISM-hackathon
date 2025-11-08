@@ -18,10 +18,10 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 2              #
-DIVERSITY_SCALE = 2        # typical range 6-12
+ROI_SCALE = 5              #
+DIVERSITY_SCALE = 4        # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
-RAR_SCALE = 8              # typical range 8-15
+RAR_SCALE = 10              # typical range 8-15
 DRAWDOWN_SCALE = 6          # typical range 3-8
 TAIL_RISK_SCALE = 7      # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
@@ -83,8 +83,8 @@ UNIQUE_PENALTY_EXPONENT: float = 1.8  # exponent >1 increases severity for conce
 # Dynamic stock limit configuration (randomized per run to discourage hard-coding strategies).
 # When enabled, runtime chosen values override the static constants above.
 DYNAMIC_STOCK_LIMITS_ENABLED: bool = True
-MAX_STOCKS_LIMIT_RANGE: tuple[int, int] = (12, 18)  # inclusive range for maximum stocks counted
-MIN_UNIQUE_STOCKS_RANGE: tuple[int, int] = (6, 10)  # inclusive range for minimum unique required
+MAX_STOCKS_LIMIT_RANGE: tuple[int, int] = (15, 25)  # inclusive range for maximum stocks counted
+MIN_UNIQUE_STOCKS_RANGE: tuple[int, int] = (4, 8)  # inclusive range for minimum unique required
 DYNAMIC_LIMITS_SEED: int | None = None  # set an int for deterministic selection (e.g. during testing)
 
 # Runtime-selected limits (populated in main()).
