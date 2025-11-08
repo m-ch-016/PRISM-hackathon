@@ -11,13 +11,14 @@ challenge:
 - Risk-adjusted returns (Sharpe / Sortino blend)
 - Drawdown resilience (lower maximum drawdown => higher score)
 - Random additive factor (stochastic noise term)
+ - Return distribution skewness (reward positive skew)
 
 The overall number of points allocated are a weighted sum of the above. A new
 drawdown term penalizes portfolios that experience deep peak-to-trough losses.
 
 $$
 	ext{points} = \alpha\cdot \text{RoI} + \beta\cdot\text{Diversification} +
-\gamma\cdot\text{Client Satisfaction} + \delta\cdot\text{RiskAdj} + \epsilon\cdot\text{DrawdownScore} + \zeta\cdot\text{RandomNoise}
+\gamma\cdot\text{Client Satisfaction} + \delta\cdot\text{RiskAdj} + \epsilon\cdot\text{DrawdownScore} + \zeta\cdot\text{RandomNoise} + \eta\cdot\text{SkewnessScore}
 $$
 
 ## Return on Investment
@@ -116,3 +117,29 @@ to disable. You can fix `RANDOM_SEED` for reproducible replay.
 
 This differs from the early override random scoring (which replaces the score).
 The additive factor only perturbs the final points.
+
+## Return Distribution Skewness
+
+Skewness measures asymmetry of daily portfolio returns. A positively skewed
+distribution often reflects strategies with occasional large upside moves and
+smaller typical drawdowns, while negative skew suggests frequent small gains
+punctuated by severe losses.
+
+We compute the (unbiased Fisher) sample skewness of daily returns and map it to
+`[0,1]` via:
+
+$$
+	ext{SkewnessScore} = 0.5 + 0.5\tanh(\text{skew})
+$$
+
+Properties:
+- Zero skew -> neutral score 0.5
+- Large positive skew -> tends toward 1.0
+- Large negative skew -> tends toward 0.0
+
+Insufficient data (fewer than 5 return observations) or undefined standard
+deviation yields a neutral 0.5.
+
+Enable by setting `SKEWNESS_SCALE > 0` in `main.py` (default 0 disables the
+metric). This complements tail risk and drawdown by considering the *shape* of
+the return distribution, not just its extremes.

@@ -20,8 +20,15 @@ CLI_SAT_SCALE = 12
 RAR_SCALE = 12
 DRAWDOWN_SCALE = 5
 TAIL_RISK_SCALE = 0
-REGIME_ROBUSTNESS_SCALE = 0  
+REGIME_ROBUSTNESS_SCALE = 0
 RANDOM_SCALE = 1
+SKEWNESS_SCALE = 2
+ENTROPY_SCALE = 0
+ROI_TRANSFORM: str | None = None  # Options: None | "log" | "sqrt" | "sigmoid"
+DIVERSITY_METHOD: str = "mse"  # "mse" or "entropy" (choose which diversification metric to apply)
+
+# Employment status configuration
+UNEMPLOYED_RISK_FACTOR = 1.2
 
 # RANDOM VARIABLE
 RANDOM_MIN = -1.0  # Lower bound for random factor (before scaling)
@@ -37,18 +44,16 @@ AGE_MID = 50
 AGE_YOUNG_DIVISOR = 12  # (age - AGE_MIN) / AGE_YOUNG_DIVISOR for ramp up
 AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
-# Employment status configuration
-UNEMPLOYED_RISK_FACTOR = 1.2
-
 # Optional portfolio safety limits
 MAX_STOCKS_LIMIT: int | None = None  # e.g. 25 means only first 25 stocks count
 MAX_POINTS_LIMIT: float | None = None  # e.g. 10000 caps points to +/- 10000
+MIN_UNIQUE_STOCKS: int | None = None  # e.g. 8 requires at least 8 distinct tickers for full points
 
 # Early random scoring (simple toggle). If enabled, final points are replaced
 # with a random float each run in the configured range.
 EARLY_RANDOM_SCORE_ENABLED: bool = True
-EARLY_RANDOM_SCORE_MIN = -30.0
-EARLY_RANDOM_SCORE_MAX = 10.0
+EARLY_RANDOM_SCORE_MIN = -20.0
+EARLY_RANDOM_SCORE_MAX = 5.0
 
 # DONT CHANGE
 DEBUG = False
@@ -227,7 +232,7 @@ def get_points(
     n_allowed_industries = len(unique_industries) - len(context.dislikes)
 
     roi = return_on_investment(profit, context)
-    diversity = diversity_score(
+    diversity_mse = diversity_score(
         df,
         stocks,
         unique_industries,
@@ -235,6 +240,14 @@ def get_points(
         sic_industry,
         ticker_details,
     )
+    diversity_entropy = entropy_diversity_score(
+        df,
+        stocks,
+        unique_industries,
+        n_allowed_industries,
+        sic_industry,
+        ticker_details,
+    ) if ENTROPY_SCALE != 0 or DIVERSITY_METHOD == "entropy" else 0.0
     client_sat = (
         client_satisfaction(df, risk_profile(context), context.age)
         if CLI_SAT_SCALE != 0
@@ -246,19 +259,7 @@ def get_points(
     regime_robustness = (
         regime_robustness_score(df) if REGIME_ROBUSTNESS_SCALE != 0 else 0.0
     )
-
-    if DEBUG:
-        print(
-            "[DEBUG] metrics:",
-            f"roi={roi:.4f}",
-            f"diversity={diversity:.4f}",
-            f"client_sat={client_sat:.4f}",
-            f"rar={rar:.4f}",
-            f"drawdown={drawdown:.4f}",
-            f"tail_risk={tail_risk:.4f}",
-            f"regime_robustness={regime_robustness:.4f}",
-            f"random_term={random_term:.4f}",
-        )
+    skewness = skewness_score(df) if SKEWNESS_SCALE != 0 else 0.0
 
     # Random additive factor (distinct from early override). Generates a value
     # in [RANDOM_MIN, RANDOM_MAX] each evaluation and scales it. Use seed for reproducibility.
@@ -268,11 +269,29 @@ def get_points(
     else:
         random_term = 0.0
 
+    if DEBUG:
+        print(
+            "[DEBUG] metrics:",
+            f"roi={roi:.4f}",
+            f"diversity_mse={diversity_mse:.4f}",
+            f"diversity_entropy={diversity_entropy:.4f}",
+            f"diversity_method={DIVERSITY_METHOD}",
+            f"client_sat={client_sat:.4f}",
+            f"rar={rar:.4f}",
+            f"drawdown={drawdown:.4f}",
+            f"tail_risk={tail_risk:.4f}",
+            f"regime_robustness={regime_robustness:.4f}",
+            f"skewness={skewness:.4f}",
+            f"random_term={random_term:.4f}",
+        )
+
     points = 0.0
     if ROI_SCALE != 0:
         points += ROI_SCALE * roi
-    if DIVERSITY_SCALE != 0:
-        points += DIVERSITY_SCALE * diversity
+    if DIVERSITY_METHOD == "mse" and DIVERSITY_SCALE != 0:
+        points += DIVERSITY_SCALE * diversity_mse
+    elif DIVERSITY_METHOD == "entropy" and ENTROPY_SCALE != 0:
+        points += ENTROPY_SCALE * diversity_entropy
     if CLI_SAT_SCALE != 0:
         points += CLI_SAT_SCALE * client_sat
     if RAR_SCALE != 0:
@@ -285,6 +304,16 @@ def get_points(
         points += REGIME_ROBUSTNESS_SCALE * regime_robustness
     if RANDOM_SCALE != 0:
         points += RANDOM_SCALE * random_term
+    if SKEWNESS_SCALE != 0:
+        points += SKEWNESS_SCALE * skewness
+
+    # Enforce minimum unique stocks requirement (multiplicative penalty if below)
+    if MIN_UNIQUE_STOCKS is not None and MIN_UNIQUE_STOCKS > 0:
+        unique_count = len({s for s, _ in stocks})
+        if unique_count < MIN_UNIQUE_STOCKS:
+            # Scale points down proportionally to coverage; avoid negative flip here
+            scarcity_factor = unique_count / MIN_UNIQUE_STOCKS
+            points *= max(0.0, scarcity_factor)
 
     value = df.groupby(level=1).first()["value"].sum()
     points *= 1 - (value / context.budget)
@@ -399,10 +428,60 @@ def regime_robustness_score(df: pd.DataFrame, segments: int = 3) -> float:
     return float(max(0.0, min(1.0, score)))
 
 
+def skewness_score(df: pd.DataFrame) -> float:
+    """Skewness score in [0,1].
+
+    Uses daily portfolio returns skewness. Positive skew (occasional large upside
+    moves) is rewarded; heavy negative skew (large downside tail) penalized.
+
+    Calculation (unbiased Fisher/Pearson):
+        skew = n/((n-1)*(n-2)) * sum(((x_i - mean)/std)^3)
+
+    Mapping to score: 0.5 + 0.5 * tanh(skew).
+        - Zero skew -> 0.5 neutral
+        - Large positive skew -> tends to 1.0
+        - Large negative skew -> tends to 0.0
+
+    Fallback neutral 0.5 if insufficient data (<5 return observations) or undefined.
+    """
+    try:
+        values = df.groupby(level=0)["value"].sum().astype(float)
+        returns = values.pct_change().dropna()
+    except Exception:
+        return 0.5
+    n = returns.size
+    if n < 5:
+        return 0.5
+    mean = float(returns.mean())
+    std = float(returns.std())
+    if std == 0 or not np.isfinite(std):
+        return 0.5
+    normed = ((returns - mean) / std) ** 3
+    m3 = float(normed.sum())
+    skew = (n / ((n - 1) * (n - 2))) * m3
+    score = 0.5 + 0.5 * np.tanh(skew)
+    return float(max(0.0, min(1.0, score)))
+
+
 def return_on_investment(profit: float, context: Context) -> float:
     """Return on investment is defined as the ratio of profit to initial budget"""
     # return np.log(profit) if profit > 0 else -np.log(abs(profit)) if profit < 0 else 0
-    return profit / context.budget
+    raw = profit / context.budget
+    if ROI_TRANSFORM is None:
+        return raw
+    try:
+        if ROI_TRANSFORM == "log":
+            # Symmetric log compression
+            return np.sign(raw) * np.log1p(abs(raw))
+        elif ROI_TRANSFORM == "sqrt":
+            return np.sign(raw) * np.sqrt(abs(raw))
+        elif ROI_TRANSFORM == "sigmoid":
+            # Use tanh for smooth saturation
+            return np.tanh(raw)
+        else:
+            return raw
+    except Exception:
+        return raw
 
 
 def diversity_score(
@@ -425,6 +504,66 @@ def diversity_score(
     sic_score = (len(unique_industries) / n_allowed_industries) / (1 + sic_mse)
 
     return stock_score + sic_score
+
+
+def entropy_diversity_score(
+    df: pd.DataFrame,
+    stocks: List[Tuple[str, int]],
+    unique_industries: set[str],
+    n_allowed_industries: int,
+    sic_industry: dict[str, list[str]],
+    ticker_details: dict,
+) -> float:
+    """Entropy-based diversification in [0,2].
+
+    Computes normalized Shannon entropy for stock allocation and industry allocation.
+    Stock entropy:
+        H_stock = -Σ p_i log(p_i) / log(n)
+    Industry entropy similar using quantity per industry.
+    Sum of both entropies yields range [0,2].
+    """
+    try:
+        stock_quantity_prods = df.groupby(level=1).first()["value"]
+    except Exception:
+        return 0.0
+    unique_stocks = set([s for s, _ in stocks])
+    if not unique_stocks:
+        return 0.0
+    stock_weights = np.array([stock_quantity_prods[s] for s in unique_stocks], dtype=float)
+    sw_sum = stock_weights.sum()
+    if sw_sum <= 0:
+        return 0.0
+    p = stock_weights / sw_sum
+    n_stocks = p.size
+    stock_entropy = 0.0
+    for pi in p:
+        if pi > 0:
+            stock_entropy -= pi * np.log(pi)
+    if n_stocks > 1:
+        stock_entropy /= np.log(n_stocks)
+    # Industry entropy
+    stocks_per_industry = stock_count_per_industry(ticker_details, stocks, sic_industry)
+    industry_vals = np.array(list(stocks_per_industry.values()), dtype=float)
+    iv_sum = industry_vals.sum()
+    if iv_sum <= 0:
+        industry_entropy = 0.0
+    else:
+        q = industry_vals / iv_sum
+        n_inds = q.size
+        industry_entropy = 0.0
+        for qi in q:
+            if qi > 0:
+                industry_entropy -= qi * np.log(qi)
+        if n_inds > 1:
+            industry_entropy /= np.log(n_inds)
+    # Adjust industry coverage proportion (like mse version) rewarding breadth over dislikes
+    coverage_factor = 0.0
+    try:
+        coverage_factor = len(unique_industries) / max(1, n_allowed_industries)
+    except Exception:
+        coverage_factor = 0.0
+    industry_entropy *= coverage_factor
+    return stock_entropy + industry_entropy
 
 
 def stock_count_per_industry(
@@ -592,6 +731,12 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
         unique_industries = json.loads(f.read())
 
     context = Context(**data["context"])
+    # Ensure dislikes is a set for faster membership tests & dedup
+    if not isinstance(context.dislikes, set):
+        try:
+            context.dislikes = set(context.dislikes)
+        except Exception:
+            context.dislikes = set()
 
     stocks = []
     for stock in data["stocks"]:
