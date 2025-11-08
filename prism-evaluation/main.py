@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
 ROI_SCALE = 35              # ROI 
-DIVERSITY_SCALE = 12         # typical range 6-12
+DIVERSITY_SCALE = 12        # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
 RAR_SCALE = 15              # typical range 8-15
 DRAWDOWN_SCALE = 8          # typical range 3-8
