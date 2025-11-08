@@ -71,7 +71,7 @@ EARLY_RANDOM_SCORE_MIN = -20.0
 EARLY_RANDOM_SCORE_MAX = 5.0
 
 # DONT CHANGE
-DEBUG = False
+DEBUG = True
 AGE_MIN = 18
 AGE_MAX = 80
 AGE_TOL_DEFAULT = 0.6
@@ -306,11 +306,13 @@ def get_points(
             f"regime_robustness={regime_robustness:.4f}",
             f"skewness={skewness:.4f}",
             f"random_term={random_term:.4f}",
+            file=sys.stderr
         )
         # Portfolio composition (ticker:quantity)
         print(
             "[DEBUG] portfolio:",
-            ", ".join(f"{t}:{q}" for t, q in stocks) or "<empty>"
+            ", ".join(f"{t}:{q}" for t, q in stocks) or "<empty>",
+            file=sys.stderr
         ) 
 
     points = 0.0
