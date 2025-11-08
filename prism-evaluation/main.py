@@ -37,10 +37,10 @@ NEAR_ZERO_ROI_PENALTY_FACTOR = 0.3      # Multiplicative penalty applied to poin
 LOW_VOL_PENALTY_ENABLED = True           # Toggle to enable ultra-low volatility penalty curve
 LOW_VOL_MIN_FACTOR = 0.20                # Fraction of tolerance defining the lower band start (only penalize insanely safe)
 LOW_VOL_FLOOR_SCORE = 0.6                # Satisfaction score at (near) zero volatility (less harsh)
-LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD = 0.8  # If risk_profile >= this, suppress or soften low-vol penalty
+LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD = 0.75  # If risk_profile >= this, suppress or soften low-vol penalty
 
 # Employment status configuration
-UNEMPLOYED_RISK_FACTOR = 1.2
+UNEMPLOYED_RISK_FACTOR = 1.5
 
 # RANDOM VARIABLE
 RANDOM_MIN = -2.0  # Lower bound for random factor (before scaling)
