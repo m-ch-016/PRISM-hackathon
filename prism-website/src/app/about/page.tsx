@@ -37,6 +37,9 @@ export default function AboutPage() {
             style={{ maxHeight: '70vh' }}
           >
             <h1 className="text-4xl font-light mb-8 text-center">
+              BIGGEST CASH PRIZE IN THE HISTORY OF GREAT UNI HACK - ￡1500
+            </h1>  
+            <h1 className="text-4xl font-light mb-8 text-center">
               Competition Instructions
             </h1>
 
@@ -89,7 +92,7 @@ export default function AboutPage() {
               <ul className="list-disc ml-8 space-y-2 mb-4">
                 <li>The competition consists of <strong>3 rounds</strong>, each lasting <strong>3 hours</strong>.</li>
                 <li>There will be a <strong>1-hour break</strong> between each round.</li>
-                <li>The total prize pool of <strong>£1500</strong> is <strong>equally distributed across the 3 rounds</strong> (i.e., £500 per round).</li>
+                <li>The total prize pool of <strong>£1500</strong> is <strong>equally distributed across the 3 rounds</strong> (i.e., £500 per round). *The prize money is capped below at ￡10 (if you win less than ￡10 pounds you win nothing.</li>
                 <li>Within each round, <strong>prizes are allocated proportionally</strong> based on the weighted returns of each team’s score on the leaderboard.</li>
                 <li>There are <strong>no judges</strong> — the final outcome is <strong>entirely determined by the live leaderboard</strong>.</li>
               </ul>
