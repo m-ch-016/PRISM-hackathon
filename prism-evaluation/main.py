@@ -14,20 +14,30 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 20              #
-DIVERSITY_SCALE = 5        # typical range 6-12
+ROI_SCALE = 30              #
+DIVERSITY_SCALE = 2        # typical range 6-12
 CLI_SAT_SCALE = 10          # typical range 6-15
-RAR_SCALE = 1              # typical range 8-15
-DRAWDOWN_SCALE = 10          # typical range 3-8
-TAIL_RISK_SCALE = 10        # enable 4-8 when used
-REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
-RANDOM_SCALE = 3            # typical range 0-3
-SKEWNESS_SCALE = 4          # typical range 0-4
+RAR_SCALE = 2              # typical range 8-15
+DRAWDOWN_SCALE = 2          # typical range 3-8
+TAIL_RISK_SCALE = 2        # enable 4-8 when used
+REGIME_ROBUSTNESS_SCALE = 2 # enable 6-10 when used
+RANDOM_SCALE = 2            # typical range 0-3
+SKEWNESS_SCALE = 1          # typical range 0-4
 ENTROPY_SCALE = 0           # if entropy method: 6-12
 ROI_TRANSFORM: str | None = None  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "mse"
 ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
 ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
+
+# Penalize portfolios that produce only a negligible positive profit ("farming" safety metrics).
+NEAR_ZERO_ROI_THRESHOLD = 0.005          # 0.5% ROI threshold below which profit is considered negligible
+NEAR_ZERO_ROI_PENALTY_FACTOR = 0.3      # Multiplicative penalty applied to points if ROI in (0, threshold)
+
+# Ultra-low volatility penalty (prevents parking in ultra-safe assets to farm metrics)
+LOW_VOL_PENALTY_ENABLED = True           # Toggle to enable ultra-low volatility penalty curve
+LOW_VOL_MIN_FACTOR = 0.20                # Fraction of tolerance defining the lower band start (only penalize insanely safe)
+LOW_VOL_FLOOR_SCORE = 0.6                # Satisfaction score at (near) zero volatility (less harsh)
+LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD = 0.8  # If risk_profile >= this, suppress or soften low-vol penalty
 
 # Employment status configuration
 UNEMPLOYED_RISK_FACTOR = 1.2
@@ -37,8 +47,11 @@ RANDOM_MIN = -2.0  # Lower bound for random factor (before scaling)
 RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
-# Target Volatility configuration
-CLIENT_SAT_TARGET_VOL_DEFAULT = 0.03
+# Target Volatility configuration (ANNUALIZED intuitive value)
+CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.1
+TRADING_DAYS_PER_YEAR = 252
+# Backward compatible alias (deprecated): if other code references the old name.
+CLIENT_SAT_TARGET_VOL_DEFAULT = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT  # DEPRECATED alias
 
 # Age tolerance configuration
 AGE_YOUNG = 30
@@ -231,7 +244,10 @@ def get_points(
     sic_industry: dict[str, list[str]],
     ticker_details: dict,
 ) -> int:
-    n_allowed_industries = len(unique_industries) - len(context.dislikes)
+    try:
+        n_allowed_industries = len(unique_industries) - len(getattr(context, "dislikes", set()))
+    except Exception:
+        n_allowed_industries = len(unique_industries)
 
     roi = return_on_investment(profit, context)
     diversity_mse = diversity_score(
@@ -251,7 +267,12 @@ def get_points(
         ticker_details,
     ) if ENTROPY_SCALE != 0 or DIVERSITY_METHOD == "entropy" else 0.0
     client_sat = (
-        client_satisfaction(df, risk_profile(context), context.age)
+        client_satisfaction(
+            df,
+            risk_profile(context),
+            context.age,
+            CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT,  # explicit annual volatility parameter
+        )
         if CLI_SAT_SCALE != 0
         else 0.0
     )
@@ -336,6 +357,14 @@ def get_points(
         pass
 
     points = points * 10  # make a nicer scale for points
+
+    # Near-zero positive ROI farming penalty: if profit tiny but > 0, scale down points.
+    try:
+        roi_raw = profit / context.budget if context.budget else 0.0
+        if 0 < roi_raw < NEAR_ZERO_ROI_THRESHOLD and points > 0:
+            points *= NEAR_ZERO_ROI_PENALTY_FACTOR
+    except Exception:
+        pass
 
     # Dock fixed amount of points, if illegal
     if len(legal_stocks) != len(stocks):
@@ -633,8 +662,27 @@ def stock_count_per_industry(
     return industry_count_map
 
 
-def client_satisfaction(df: pd.DataFrame, risk_profile: float, age: int | None = None, target_vol: float = CLIENT_SAT_TARGET_VOL_DEFAULT) -> float:
-    """Client satisfaction score in [0,1] using returns-based volatility."""
+def client_satisfaction(
+    df: pd.DataFrame,
+    risk_profile: float,
+    age: int | None = None,
+    target_vol_annual: float = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT,
+) -> float:
+    """Return client satisfaction in [0,1] based on realized daily volatility.
+
+    This version expects an ANNUAL target volatility. It converts to daily internally:
+        daily_target = annual / sqrt(TRADING_DAYS_PER_YEAR)
+
+    Scoring shape:
+        1. Compute tolerance = daily_target * combined_factor(age,risk).
+        2. If LOW_VOL_PENALTY_ENABLED is False:
+              volatility <= tolerance -> 1.0 else linear decay above tolerance.
+        3. If LOW_VOL_PENALTY_ENABLED is True:
+              Below low_band (tolerance * LOW_VOL_MIN_FACTOR) -> ramp from LOW_VOL_FLOOR_SCORE to ~0.95.
+              Between low_band and tolerance -> ramp 0.95 -> 1.0.
+              Above tolerance -> linear decay (1 - (excess/tolerance)).
+    """
+    # Daily returns
     r = df["value"].pct_change().dropna()
     if r.size == 0:
         return 0.0
@@ -642,6 +690,7 @@ def client_satisfaction(df: pd.DataFrame, risk_profile: float, age: int | None =
     if not np.isfinite(portfolio_vol):
         return 0.0
 
+    # Risk & age modulation
     rp = max(0.0, min(1.2, risk_profile))
     base_from_risk = 0.9 - 0.6 * (rp / 1.2)
 
@@ -657,13 +706,48 @@ def client_satisfaction(df: pd.DataFrame, risk_profile: float, age: int | None =
         return (AGE_MAX - a) / AGE_OLD_DIVISOR
 
     combined_factor = max(0.05, base_from_risk * age_tolerance(age))
-    tolerance = target_vol * combined_factor
+    daily_target_vol = target_vol_annual / np.sqrt(TRADING_DAYS_PER_YEAR)
+    tolerance = max(1e-9, daily_target_vol * combined_factor)
 
+    # Determine whether to apply low-vol penalty strength.
+    # risk_profile: high => more risk-averse. If above threshold, weaken penalty.
+    risk_aversion_scale = 0.0 if risk_profile >= LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD else 1.0
+
+    # If user budget is much smaller than salary (or unemployed), allow low volatility.
+    # We approximate salary/budget ratio indirectly through passed risk_profile (already influenced).
+    # Additional softening: interpolate penalty scale when near threshold.
+    if 0 < risk_profile < LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD:
+        # Linear fade as risk_profile approaches threshold from below.
+        risk_aversion_scale = (LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD - risk_profile) / LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD
+    # Clamp
+    risk_aversion_scale = max(0.0, min(1.0, risk_aversion_scale))
+
+    # Simple path (no low-vol penalty feature or penalty disabled by aversion) retains original semantics
+    if not LOW_VOL_PENALTY_ENABLED or risk_aversion_scale == 0.0:
+        if portfolio_vol <= tolerance:
+            return 1.0
+        score_simple = 1 - (portfolio_vol - tolerance) / tolerance
+        return float(max(0.0, min(1.0, score_simple)))
+
+    # Low-vol penalty path with conditional scaling
+    low_band = tolerance * LOW_VOL_MIN_FACTOR
+    if portfolio_vol < low_band:
+        frac = portfolio_vol / max(low_band, 1e-12)  # [0,1)
+        # Adjust dynamic floor and peak based on aversion: high aversion -> floor closer to 1.0
+        dyn_floor = LOW_VOL_FLOOR_SCORE * risk_aversion_scale + (1.0) * (1 - risk_aversion_scale)
+        dyn_peak = 0.95 * risk_aversion_scale + 1.0 * (1 - risk_aversion_scale)
+        score_low = dyn_floor + (dyn_peak - dyn_floor) * frac
+        return float(max(0.0, min(1.0, score_low)))
     if portfolio_vol <= tolerance:
-        return 1.0
-
-    score = 1 - (portfolio_vol - tolerance) / max(tolerance, 1e-9)
-    return float(max(0.0, min(1.0, score)))
+        frac = (portfolio_vol - low_band) / max(tolerance - low_band, 1e-12)
+        dyn_peak = 0.95 * risk_aversion_scale + 1.0 * (1 - risk_aversion_scale)
+        dyn_top = 1.0  # always 1 at tolerance
+        score_mid = dyn_peak + (dyn_top - dyn_peak) * frac
+        return float(max(0.0, min(1.0, score_mid)))
+    # Above tolerance: penalty unaffected (investor already exceeding comfort zone)
+    excess = portfolio_vol - tolerance
+    score_high = 1 - excess / tolerance
+    return float(max(0.0, min(1.0, score_high)))
 
 
 def risk_adjusted_returns(
