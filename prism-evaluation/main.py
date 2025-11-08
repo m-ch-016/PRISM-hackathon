@@ -18,17 +18,17 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 5              #
-DIVERSITY_SCALE = 5        # typical range 6-12
+ROI_SCALE = 25              #
+DIVERSITY_SCALE = 8        # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
-RAR_SCALE = 10              # typical range 8-15
-DRAWDOWN_SCALE = 5          # typical range 3-8
-TAIL_RISK_SCALE = 7      # enable 4-8 when used
+RAR_SCALE = 12              # typical range 8-15
+DRAWDOWN_SCALE = 8          # typical range 3-8
+TAIL_RISK_SCALE = 8      # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 0            # typical range 0-3
 SKEWNESS_SCALE = 0          # typical range 0-4
 ENTROPY_SCALE = 8           # if entropy method: 6-12
-ROI_TRANSFORM: str = "sqrt"  # Options: None | "log" | "sqrt" | "sigmoid"
+ROI_TRANSFORM: str = "sigmoid"  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "entropy"
 ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
 ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
@@ -41,7 +41,7 @@ TOP_PERFORMERS_LAST_20Y: list[str] = [
 ]
 TOP_PERFORMER_PENALTY_ENABLED: bool = True
 TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.9  # per top-performer stock (compounds)
-TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.5  # floor so large counts don't erase score
+TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.6  # floor so large counts don't erase score
 TOP_PERFORMER_PENALIZE_NEGATIVE: bool = False  # keep False so losses aren't reduced (no benefit)
 
 # Penalize portfolios that produce only a negligible positive profit ("farming" safety metrics).
@@ -76,7 +76,7 @@ AGE_OLD_DIVISOR = 20    # (AGE_MAX - age) / AGE_OLD_DIVISOR for decline
 
 # Optional portfolio safety limits
 MAX_STOCKS_LIMIT: int = 15  # static fallback upper bound on counted stocks
-MAX_POINTS_LIMIT: float = 500  # e.g. 10000 caps points to +/- 10000
+MAX_POINTS_LIMIT: float = 1000  # e.g. 10000 caps points to +/- 10000
 MIN_UNIQUE_STOCKS: int = 8  # static fallback minimum distinct tickers for full points
 UNIQUE_PENALTY_EXPONENT: float = 1.8  # exponent >1 increases severity for concentrated portfolios
 
