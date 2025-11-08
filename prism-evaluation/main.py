@@ -14,12 +14,12 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 50              # typical range 10-25
-DIVERSITY_SCALE = 8        # typical range 6-12
+ROI_SCALE = 40              # typical range 10-25
+DIVERSITY_SCALE = 3        # typical range 6-12
 CLI_SAT_SCALE = 5          # typical range 6-15
-RAR_SCALE = 5              # typical range 8-15
-DRAWDOWN_SCALE = 15          # typical range 3-8
-TAIL_RISK_SCALE = 8        # enable 4-8 when used
+RAR_SCALE = 1              # typical range 8-15
+DRAWDOWN_SCALE = 2          # typical range 3-8
+TAIL_RISK_SCALE = 1        # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 3            # typical range 0-3
 SKEWNESS_SCALE = 4          # typical range 0-4
