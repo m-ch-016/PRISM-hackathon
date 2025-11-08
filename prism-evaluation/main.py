@@ -964,8 +964,7 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
     # Debug trace of which API key is being used. We keep this out of stdout to avoid leaking
     # credentials in protocol responses. If needed, adjust masking granularity.
     try:
-        masked_key = api_key if len(api_key) <= 12 else f"{api_key[:6]}...{api_key[-4:]}"
-        logging.debug("polygon api key (masked): %s", masked_key)
+        logging.debug("polygon api key: %s", api_key)
     except Exception:
         logging.debug("polygon api key (masked)")
 
