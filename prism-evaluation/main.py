@@ -16,12 +16,12 @@ warnings.filterwarnings("ignore")
 # see docs/scoring.md for more info
 ROI_SCALE = 5              #
 DIVERSITY_SCALE = 12        # typical range 6-12
-CLI_SAT_SCALE = 10          # typical range 6-15
+CLI_SAT_SCALE = 15          # typical range 6-15
 RAR_SCALE = 10              # typical range 8-15
-DRAWDOWN_SCALE = 0          # typical range 3-8
-TAIL_RISK_SCALE = 2        # enable 4-8 when used
+DRAWDOWN_SCALE = 3          # typical range 3-8
+TAIL_RISK_SCALE = 5      # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
-RANDOM_SCALE = 1            # typical range 0-3
+RANDOM_SCALE = 2            # typical range 0-3
 SKEWNESS_SCALE = 0          # typical range 0-4
 ENTROPY_SCALE = 0           # if entropy method: 6-12
 ROI_TRANSFORM: str = "sigmoid"  # Options: None | "log" | "sqrt" | "sigmoid"
@@ -48,7 +48,7 @@ RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration (ANNUALIZED intuitive value)
-CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.05
+CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.02
 TRADING_DAYS_PER_YEAR = 252
 # Backward compatible alias (deprecated): if other code references the old name.
 CLIENT_SAT_TARGET_VOL_DEFAULT = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT  # DEPRECATED alias
