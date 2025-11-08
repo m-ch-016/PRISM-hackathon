@@ -35,7 +35,6 @@ ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
 
 # High performing tickers (approx last 20y) that tend to dominate naive strategies.
 # We apply a gentle multiplicative penalty to discourage blindly stuffing these.
-# NOTE: This is a tuning surface; keep list short and update if regime changes.
 TOP_PERFORMERS_LAST_20Y: list[str] = [
     "NVDA", "TSLA", "AAPL", "AMZN", "MSFT", "META", "GOOGL", "PLTR"
 ]
