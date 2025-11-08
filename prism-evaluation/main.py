@@ -18,17 +18,17 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 25              # ROI 
-DIVERSITY_SCALE = 8         # typical range 6-12
+ROI_SCALE = 35              # ROI 
+DIVERSITY_SCALE = 10         # typical range 6-12
 CLI_SAT_SCALE = 15          # typical range 6-15
-RAR_SCALE = 12              # typical range 8-15
+RAR_SCALE = 15              # typical range 8-15
 DRAWDOWN_SCALE = 8          # typical range 3-8
 TAIL_RISK_SCALE = 8         # enable 4-8 when used
 REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
 RANDOM_SCALE = 3            # typical range 0-3
 SKEWNESS_SCALE = 0          # typical range 0-4
 ENTROPY_SCALE = 8           # if entropy method: 6-12
-ROI_TRANSFORM: str = "sigmoid"  # Options: None | "log" | "sqrt" | "sigmoid"
+ROI_TRANSFORM: str | None = None  # Options: None | "log" | "sqrt" | "sigmoid"
 DIVERSITY_METHOD: str = "entropy"
 ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
 ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
@@ -39,9 +39,10 @@ ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
 TOP_PERFORMERS_LAST_20Y: list[str] = [
     "NVDA", "TSLA", "AAPL", "AMZN", "MSFT", "META", "GOOGL", "PLTR"
 ]
+
 TOP_PERFORMER_PENALTY_ENABLED: bool = True
-TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.95  # per top-performer stock (compounds)
-TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.75  # floor so large counts don't erase score
+TOP_PERFORMER_PENALTY_MULTIPLIER: float = 0.92  # per top-performer stock (compounds)
+TOP_PERFORMER_MAX_PENALTY_MULTIPLIER: float = 0.65  # floor so large counts don't erase score
 TOP_PERFORMER_PENALIZE_NEGATIVE: bool = False  # keep False so losses aren't reduced (no benefit)
 
 # Penalize portfolios that produce only a negligible positive profit ("farming" safety metrics).
@@ -52,7 +53,7 @@ NEAR_ZERO_ROI_PENALTY_FACTOR = 0.2      # Multiplicative penalty applied to poin
 LOW_VOL_PENALTY_ENABLED = True           # Toggle to enable ultra-low volatility penalty curve
 LOW_VOL_MIN_FACTOR = 0.20                # Fraction of tolerance defining the lower band start (only penalize insanely safe)
 LOW_VOL_FLOOR_SCORE = 0.6                # Satisfaction score at (near) zero volatility (less harsh)
-LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD = 0.75  # If risk_profile >= this, suppress or soften low-vol penalty
+LOW_VOL_PENALTY_RISK_AVERSION_THRESHOLD = 0.6  # If risk_profile >= this, suppress or soften low-vol penalty
 
 # Employment status configuration
 UNEMPLOYED_RISK_FACTOR = 2
@@ -63,7 +64,7 @@ RANDOM_MAX = 2.0   # Upper bound for random factor (before scaling)
 RANDOM_SEED: int | None = None  # Optional fixed seed for reproducibility of random term
 
 # Target Volatility configuration (ANNUALIZED intuitive value)
-CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.12  # 15% annual volatility target
+CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT = 0.1  # 15% annual volatility target
 TRADING_DAYS_PER_YEAR = 252
 # Backward compatible alias (deprecated): if other code references the old name.
 CLIENT_SAT_TARGET_VOL_DEFAULT = CLIENT_SAT_TARGET_VOL_ANNUAL_DEFAULT  # DEPRECATED alias
