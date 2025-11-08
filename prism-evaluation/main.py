@@ -967,7 +967,7 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
         masked_key = api_key if len(api_key) <= 12 else f"{api_key[:6]}...{api_key[-4:]}"
         logging.debug("polygon api key (masked): %s", masked_key)
     except Exception:
-        pass
+        logging.debug("polygon api key (masked)")
 
     with open(f"{args.basedir}/sic_industry.json", "r") as f:
         sic_industry = json.loads(f.read())
