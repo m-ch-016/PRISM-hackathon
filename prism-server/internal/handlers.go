@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"io"
-	"bytes"
+	_ "io"
+	_ "bytes"
 )
 
 var port int = 1
@@ -119,32 +119,32 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// h.userContextMutex.Lock()
-	// userkastTime, found := h.lastRequestTime[apiKey]
-	// h.userContextMutex.Unlock()
-	// if !found {
-	// 	h.userContextMutex.Lock()
-	// 	h.lastRequestTime[apiKey] = time.Now()
-	// 	h.userContextMutex.Unlock()
-	// } else {
-	// 	if userLastTime.Add(h.maxDeltaSpamTime).After(time.Now()) {
-	// 		// Spam detected
-	// 		// Penalise
-	// 		_, err = h.db.Exec("UPDATE teams SET profit = profit * 0.75, points = points * 0.75, last_submission_time = NOW() WHERE api_key = $1", apiKey)
-	// 		if err != nil {
-	// 			fmt.Printf("%v\n", err)
-	// 			http.Error(w, "An error was encountered updating the database, please reach out to the administrator if this keeps happening.", http.StatusInternalServerError)
-	// 			return
-	// 		}
-	// 		// Return, do not service.
-	// 		http.Error(w, fmt.Sprintf("You have re-requested within %v duration, please reduce your spam. You have been penalised a little bit.", h.maxDeltaSpamTime), http.StatusInternalServerError)
-	// 		return
-	// 	} else {
-	// 		h.userContextMutex.Lock()
-	// 		h.lastRequestTime[apiKey] = time.Now()
-	// 		h.userContextMutex.Unlock()
-	// 	}
-	// }
+	h.userContextMutex.Lock()
+	userLastTime, found := h.lastRequestTime[apiKey]
+	h.userContextMutex.Unlock()
+	if !found {
+		h.userContextMutex.Lock()
+		h.lastRequestTime[apiKey] = time.Now()
+		h.userContextMutex.Unlock()
+	} else {
+		if userLastTime.Add(h.maxDeltaSpamTime).After(time.Now()) {
+			// Spam detected
+			// Penalise
+			_, err = h.db.Exec("UPDATE teams SET profit = profit * 0.75, points = points * 0.75, last_submission_time = NOW() WHERE api_key = $1", apiKey)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+				http.Error(w, "An error was encountered updating the database, please reach out to the administrator if this keeps happening.", http.StatusInternalServerError)
+				return
+			}
+			// Return, do not service.
+			http.Error(w, fmt.Sprintf("You have re-requested within %v duration, please reduce your spam. You have been penalised a little bit.", h.maxDeltaSpamTime), http.StatusInternalServerError)
+			return
+		} else {
+			h.userContextMutex.Lock()
+			h.lastRequestTime[apiKey] = time.Now()
+			h.userContextMutex.Unlock()
+		}
+	}
 
 	randomContext := GenerateRandomContext()
 
@@ -162,9 +162,11 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	       - 8002
 	       - 8003
 	       - 8004
-	       - maybe more ~ cyrus 7/11
+	       - 8005
+	       - 8006
 	    Locks around the port update since it is shared amongst goroutines that all serve the go HTTP server (i think)
 	*/
+	/*
 	h.pyServerMutex.Lock()
 	// Base URL
 	base_url := "http://prism-llm:800%d/generate"
@@ -176,6 +178,9 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	port = port%h.numLLMServers + 1
 	// Unlock
 	h.pyServerMutex.Unlock()
+
+
+	start := time.Now()
 	//Make the request
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(content))
 	if err != nil {
@@ -190,6 +195,10 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error reading LLM response body:", err)
 		return
 	}
+        duration := time.Since(start)
+	duration.Seconds()
+	fmt.Printf("LLM took %v to reply\n", duration)
+
 
 	//Unmarshal the response into the LLMResponse struct
 	var llmResp LLMResponse
@@ -203,11 +212,10 @@ func (h *HandlersConfig) GetHandler(w http.ResponseWriter, r *http.Request) {
 	resp_to_user := Response{
 		Message: llmResp.Body,
 	}
-	/*
+	*/
 	resp_to_user := Response{
 		Message: string(content),
 	}
-	*/
 
 	// Map context to the individual user, identified by their API token.
 	h.userContextMutex.Lock()
