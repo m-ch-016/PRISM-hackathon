@@ -14,18 +14,20 @@ warnings.filterwarnings("ignore")
 
 # Scaling constants for calculating points
 # see docs/scoring.md for more info
-ROI_SCALE = 20
-DIVERSITY_SCALE = 12
-CLI_SAT_SCALE = 12
-RAR_SCALE = 12
-DRAWDOWN_SCALE = 5
-TAIL_RISK_SCALE = 0
-REGIME_ROBUSTNESS_SCALE = 0
-RANDOM_SCALE = 1
-SKEWNESS_SCALE = 2
-ENTROPY_SCALE = 0
+ROI_SCALE = 20              # typical range 10-25
+DIVERSITY_SCALE = 12        # typical range 6-12
+CLI_SAT_SCALE = 12          # typical range 6-15
+RAR_SCALE = 12              # typical range 8-15
+DRAWDOWN_SCALE = 3          # typical range 3-8
+TAIL_RISK_SCALE = 0         # enable 4-8 when used
+REGIME_ROBUSTNESS_SCALE = 0 # enable 6-10 when used
+RANDOM_SCALE = 2            # typical range 0-3
+SKEWNESS_SCALE = 2          # typical range 0-4
+ENTROPY_SCALE = 0           # if entropy method: 6-12
 ROI_TRANSFORM: str | None = None  # Options: None | "log" | "sqrt" | "sigmoid"
-DIVERSITY_METHOD: str = "mse"  # "mse" or "entropy" (choose which diversification metric to apply)
+DIVERSITY_METHOD: str = "mse"
+ROI_FLOOR: float | None = None  # Minimum ROI after transform (None disables)
+ROI_CEILING: float | None = None  # Maximum ROI after transform (None disables)
 
 # Employment status configuration
 UNEMPLOYED_RISK_FACTOR = 1.2
@@ -468,20 +470,36 @@ def return_on_investment(profit: float, context: Context) -> float:
     # return np.log(profit) if profit > 0 else -np.log(abs(profit)) if profit < 0 else 0
     raw = profit / context.budget
     if ROI_TRANSFORM is None:
-        return raw
+        roi_val = raw
     try:
         if ROI_TRANSFORM == "log":
             # Symmetric log compression
-            return np.sign(raw) * np.log1p(abs(raw))
+            roi_val = np.sign(raw) * np.log1p(abs(raw))
         elif ROI_TRANSFORM == "sqrt":
-            return np.sign(raw) * np.sqrt(abs(raw))
+            roi_val = np.sign(raw) * np.sqrt(abs(raw))
         elif ROI_TRANSFORM == "sigmoid":
             # Use tanh for smooth saturation
-            return np.tanh(raw)
+            roi_val = np.tanh(raw)
         else:
-            return raw
+            roi_val = raw
     except Exception:
-        return raw
+        roi_val = raw
+
+    # Apply optional floor/ceiling clamps if configured
+    try:
+        if ROI_FLOOR is not None and ROI_CEILING is not None and ROI_CEILING < ROI_FLOOR:
+            # Safety swap if misconfigured
+            floor, ceiling = ROI_CEILING, ROI_FLOOR
+        else:
+            floor, ceiling = ROI_FLOOR, ROI_CEILING
+        if floor is not None:
+            roi_val = max(floor, roi_val)
+        if ceiling is not None:
+            roi_val = min(ceiling, roi_val)
+    except Exception:
+        # On any error, leave roi_val unchanged
+        pass
+    return roi_val
 
 
 def diversity_score(
@@ -492,18 +510,24 @@ def diversity_score(
     sic_industry: dict[str, list[str]],
     ticker_details: dict,
 ) -> float:
-
-    stock_quantity_prods = df.groupby(level=1).first()["value"]
-    unique_stocks = set([s for s, _ in stocks])
-    stock_counts = [stock_quantity_prods[s] for s in unique_stocks]
-    stocks_per_industry = stock_count_per_industry(ticker_details, stocks, sic_industry)
-    stock_mse = mse_from_ideal(stock_counts)
-    sic_mse = mse_from_ideal(list(stocks_per_industry.values()))
-
-    stock_score = np.log(1 + len(stocks)) / (1 + len(unique_stocks) * stock_mse)
-    sic_score = (len(unique_industries) / n_allowed_industries) / (1 + sic_mse)
-
-    return stock_score + sic_score
+    """MSE-based diversification. Returns 0.0 on any failure."""
+    try:
+        stock_quantity_prods = df.groupby(level=1).first()["value"]
+        unique_stocks = set([s for s, _ in stocks])
+        if not unique_stocks:
+            return 0.0
+        stock_counts = [stock_quantity_prods[s] for s in unique_stocks]
+        stocks_per_industry = stock_count_per_industry(ticker_details, stocks, sic_industry)
+        stock_mse = mse_from_ideal(stock_counts)
+        sic_mse = mse_from_ideal(list(stocks_per_industry.values()))
+        stock_score = np.log(1 + len(stocks)) / (1 + len(unique_stocks) * stock_mse)
+        sic_score = (len(unique_industries) / max(1, n_allowed_industries)) / (1 + sic_mse)
+        value = stock_score + sic_score
+        if not np.isfinite(value):
+            return 0.0
+        return float(value)
+    except Exception:
+        return 0.0
 
 
 def entropy_diversity_score(
@@ -524,46 +548,43 @@ def entropy_diversity_score(
     """
     try:
         stock_quantity_prods = df.groupby(level=1).first()["value"]
-    except Exception:
-        return 0.0
-    unique_stocks = set([s for s, _ in stocks])
-    if not unique_stocks:
-        return 0.0
-    stock_weights = np.array([stock_quantity_prods[s] for s in unique_stocks], dtype=float)
-    sw_sum = stock_weights.sum()
-    if sw_sum <= 0:
-        return 0.0
-    p = stock_weights / sw_sum
-    n_stocks = p.size
-    stock_entropy = 0.0
-    for pi in p:
-        if pi > 0:
-            stock_entropy -= pi * np.log(pi)
-    if n_stocks > 1:
-        stock_entropy /= np.log(n_stocks)
-    # Industry entropy
-    stocks_per_industry = stock_count_per_industry(ticker_details, stocks, sic_industry)
-    industry_vals = np.array(list(stocks_per_industry.values()), dtype=float)
-    iv_sum = industry_vals.sum()
-    if iv_sum <= 0:
-        industry_entropy = 0.0
-    else:
-        q = industry_vals / iv_sum
-        n_inds = q.size
-        industry_entropy = 0.0
-        for qi in q:
-            if qi > 0:
-                industry_entropy -= qi * np.log(qi)
-        if n_inds > 1:
-            industry_entropy /= np.log(n_inds)
-    # Adjust industry coverage proportion (like mse version) rewarding breadth over dislikes
-    coverage_factor = 0.0
-    try:
+        unique_stocks = set([s for s, _ in stocks])
+        if not unique_stocks:
+            return 0.0
+        stock_weights = np.array([stock_quantity_prods[s] for s in unique_stocks], dtype=float)
+        sw_sum = stock_weights.sum()
+        if sw_sum <= 0:
+            return 0.0
+        p = stock_weights / sw_sum
+        n_stocks = p.size
+        stock_entropy = 0.0
+        for pi in p:
+            if pi > 0:
+                stock_entropy -= pi * np.log(pi)
+        if n_stocks > 1:
+            stock_entropy /= np.log(n_stocks)
+        stocks_per_industry = stock_count_per_industry(ticker_details, stocks, sic_industry)
+        industry_vals = np.array(list(stocks_per_industry.values()), dtype=float)
+        iv_sum = industry_vals.sum()
+        if iv_sum <= 0:
+            industry_entropy = 0.0
+        else:
+            q = industry_vals / iv_sum
+            n_inds = q.size
+            industry_entropy = 0.0
+            for qi in q:
+                if qi > 0:
+                    industry_entropy -= qi * np.log(qi)
+            if n_inds > 1:
+                industry_entropy /= np.log(n_inds)
         coverage_factor = len(unique_industries) / max(1, n_allowed_industries)
+        industry_entropy *= coverage_factor
+        value = stock_entropy + industry_entropy
+        if not np.isfinite(value):
+            return 0.0
+        return float(value)
     except Exception:
-        coverage_factor = 0.0
-    industry_entropy *= coverage_factor
-    return stock_entropy + industry_entropy
+        return 0.0
 
 
 def stock_count_per_industry(
@@ -703,6 +724,14 @@ def evaluate(
         - df.groupby(level=1).first()["value"].sum()
     )
 
+    # Early random scoring short-circuit: generate points immediately and skip metrics
+    if EARLY_RANDOM_SCORE_ENABLED:
+        rand_points = round(
+            random.uniform(EARLY_RANDOM_SCORE_MIN, EARLY_RANDOM_SCORE_MAX),
+            EARLY_RANDOM_SCORE_DECIMALS,
+        )
+        return True, "", profit, rand_points
+
     points = get_points(
         df,
         profit,
@@ -770,13 +799,6 @@ def main(api_key: str, data: Dict[str, Union[List[Dict[str, int]], Any]]):
     passed, error_message, profit, points = evaluate(
         df, stocks, context, sic_industry, unique_industries, ref_client, args.basedir
     )
-
-    # Simple early random scoring override (always applies if enabled)
-    if EARLY_RANDOM_SCORE_ENABLED:
-        points = round(
-            random.uniform(EARLY_RANDOM_SCORE_MIN, EARLY_RANDOM_SCORE_MAX),
-            EARLY_RANDOM_SCORE_DECIMALS,
-        )
 
     print(
         json.dumps(
